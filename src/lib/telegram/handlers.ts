@@ -473,13 +473,20 @@ export class TelegramHandler {
       msg += `📅 Início: <b>${date}</b>\n`;
       msg += `📌 1ª Parcela: ${isPaid ? "✅ <i>Paga</i>" : "⏳ <i>Pendente</i>"}`;
 
+      const buttons = [];
+      if (!isPaid) {
+        buttons.push([{ text: "✅ Marcar como Pago", callback_data: `pay_${insertedId}` }]);
+      }
+      buttons.push([
+        { text: "🏷️ Alterar Categoria", callback_data: `editcat_${insertedId}` },
+        { text: "🗑️ Desfazer", callback_data: `del_${insertedId}` },
+      ]);
+      buttons.push([{ text: "📊 Ver Resumo", callback_data: "view_summary" }]);
+
       await this.client.sendMessage(chatId, msg, {
         parse_mode: "HTML",
         reply_markup: {
-          inline_keyboard: [
-            [{ text: "📊 Ver Resumo", callback_data: "view_summary" }],
-            insertedId ? [{ text: "🗑️ Desfazer", callback_data: `del_${insertedId}` }] : [],
-          ].filter((row) => row.length > 0),
+          inline_keyboard: buttons,
         },
       });
 
@@ -524,9 +531,10 @@ export class TelegramHandler {
       buttons.push([{ text: "✅ Marcar como Pago", callback_data: `pay_${insertedId}` }]);
     }
     buttons.push([
-      { text: "📊 Ver Resumo", callback_data: "view_summary" },
+      { text: "🏷️ Alterar Categoria", callback_data: `editcat_${insertedId}` },
       { text: "🗑️ Desfazer", callback_data: `del_${insertedId}` },
     ]);
+    buttons.push([{ text: "📊 Ver Resumo", callback_data: "view_summary" }]);
 
     await this.client.sendMessage(chatId, msg, {
       parse_mode: "HTML",
@@ -903,6 +911,115 @@ export class TelegramHandler {
         }
       } else {
         await this.client.answerCallbackQuery(query.id, { text: "Conta não encontrada.", show_alert: true });
+      }
+      return;
+    }
+
+    // Choose category prompt: editcat_<txnId>
+    if (data.startsWith("editcat_")) {
+      const txnId = parseInt(data.replace("editcat_", ""), 10);
+      if (isNaN(txnId)) {
+        await this.client.answerCallbackQuery(query.id);
+        return;
+      }
+
+      const [txn] = await db
+        .select()
+        .from(transactions)
+        .where(and(eq(transactions.id, txnId), eq(transactions.userId, user.id)))
+        .limit(1);
+
+      if (!txn) {
+        await this.client.answerCallbackQuery(query.id, { text: "Lançamento não encontrado.", show_alert: true });
+        return;
+      }
+
+      const userCategories = await db
+        .select()
+        .from(categories)
+        .where(and(eq(categories.userId, user.id), eq(categories.type, txn.type)))
+        .orderBy(categories.id);
+
+      const catButtons = [];
+      for (let i = 0; i < userCategories.length; i += 2) {
+        const row = [
+          {
+            text: userCategories[i].name,
+            callback_data: `setcat_${txnId}_${userCategories[i].id}`,
+          },
+        ];
+        if (userCategories[i + 1]) {
+          row.push({
+            text: userCategories[i + 1].name,
+            callback_data: `setcat_${txnId}_${userCategories[i + 1].id}`,
+          });
+        }
+        catButtons.push(row);
+      }
+
+      catButtons.push([{ text: "🔙 Cancelar", callback_data: `view_summary` }]);
+
+      await this.client.answerCallbackQuery(query.id);
+      await this.client.sendMessage(
+        chatId,
+        `🏷️ <b>Selecione a nova categoria para:</b>\n<i>"${txn.description}"</i> (${money(txn.amountCents)})`,
+        {
+          parse_mode: "HTML",
+          reply_markup: { inline_keyboard: catButtons },
+        },
+      );
+      return;
+    }
+
+    // Set new category: setcat_<txnId>_<catId>
+    if (data.startsWith("setcat_")) {
+      const parts = data.replace("setcat_", "").split("_");
+      const txnId = parseInt(parts[0], 10);
+      const catId = parseInt(parts[1], 10);
+
+      if (isNaN(txnId) || !catId) {
+        await this.client.answerCallbackQuery(query.id);
+        return;
+      }
+
+      const [category] = await db
+        .select()
+        .from(categories)
+        .where(and(eq(categories.id, catId), eq(categories.userId, user.id)))
+        .limit(1);
+
+      if (!category) {
+        await this.client.answerCallbackQuery(query.id, { text: "Categoria não encontrada.", show_alert: true });
+        return;
+      }
+
+      const [updated] = await db
+        .update(transactions)
+        .set({ categoryId: catId })
+        .where(and(eq(transactions.id, txnId), eq(transactions.userId, user.id)))
+        .returning({ id: transactions.id, description: transactions.description, amountCents: transactions.amountCents });
+
+      if (updated) {
+        await this.client.answerCallbackQuery(query.id, {
+          text: `✅ Categoria alterada para ${category.name}!`,
+        });
+
+        await this.client.sendMessage(
+          chatId,
+          `🏷️ Categoria de <b>"${updated.description}"</b> alterada com sucesso para <b>${category.name}</b>!`,
+          {
+            parse_mode: "HTML",
+            reply_markup: {
+              inline_keyboard: [[{ text: "📊 Ver Resumo", callback_data: "view_summary" }]],
+            },
+          },
+        );
+
+        if (category.type === "expense") {
+          await checkBudgetAlert(user.id, catId);
+        }
+      } else {
+        await this.client.answerCallbackQuery(query.id, { text: "Lançamento não encontrado.", show_alert: true });
       }
       return;
     }

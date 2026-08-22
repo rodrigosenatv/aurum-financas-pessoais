@@ -1,5 +1,5 @@
 import type { Category } from "@/db/schema";
-import type { ParsedTransactionResult } from "./gemini";
+import { matchCategory, type ParsedTransactionResult } from "./gemini";
 
 const INCOME_KEYWORDS = [
   "salario",
@@ -40,6 +40,7 @@ const EXPENSE_KEYWORDS = [
   "uber",
   "99",
   "taxi",
+  "táxi",
   "gasolina",
   "combustivel",
   "combustível",
@@ -54,6 +55,9 @@ const EXPENSE_KEYWORDS = [
   "cartao",
   "cartão",
   "fatura",
+  "unha",
+  "cabelo",
+  "salão",
 ];
 
 function getTodayIso(): string {
@@ -187,7 +191,6 @@ export function parseNaturalLanguage(text: string, categories: Category[]): Pars
   }
 
   // 5. Extract amount in BRL (e.g., R$ 45,90, 45.90, 45,90, 120, 1500, 1.250,00)
-  // Regex looks for R$ 45,90 or standalone numbers like 45,90 or 45
   const amountRegex = /(?:R\$\s*)?(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})|\d+(?:[.,]\d{1,2})?)(?:\s*(?:reais|k))?\b/i;
   const amountMatch = cleaned.match(amountRegex);
 
@@ -201,7 +204,7 @@ export function parseNaturalLanguage(text: string, categories: Category[]): Pars
   // Remove the matched amount string from the text to get remaining description + category
   cleaned = cleaned.replace(amountMatch[0], " ").replace(/\s+/g, " ").trim();
 
-  // 6. Match category and determine transaction type
+  // 6. Determine transaction type
   const lowerAll = (raw + " " + cleaned).toLowerCase();
 
   let detectedType: "income" | "expense" = forceType ?? "expense";
@@ -213,78 +216,18 @@ export function parseNaturalLanguage(text: string, categories: Category[]): Pars
     }
   }
 
-  // Find best matching category by name or keywords
-  let bestCategory: Category | undefined;
+  // 7. Match category using unified matcher
+  const matchedCat = matchCategory(undefined, undefined, detectedType, categories, `${cleaned} ${raw}`);
 
-  // First check if any category name is explicitly typed
-  for (const cat of categories) {
-    if (cat.type === detectedType) {
-      const catNameLower = cat.name.toLowerCase();
-      if (cleaned.toLowerCase().includes(catNameLower)) {
-        bestCategory = cat;
-        // Remove category name from description
-        cleaned = cleaned.replace(new RegExp(`\\b${catNameLower}\\b`, "gi"), " ").trim();
-        break;
-      }
-    }
-  }
-
-  // If no direct category name match, infer category from keywords
-  if (!bestCategory) {
-    for (const cat of categories) {
-      if (cat.type === detectedType) {
-        const catName = cat.name.toLowerCase();
-        if (catName.includes("alimenta") || catName.includes("comida") || catName.includes("refei")) {
-          if (/(lanche|almo[cç]o|jantar|mercado|supermercado|padaria|restaurante|ifood|pizza|hamburguer)/i.test(lowerAll)) {
-            bestCategory = cat;
-            break;
-          }
-        } else if (catName.includes("transporte") || catName.includes("veiculo") || catName.includes("carro")) {
-          if (/(uber|99|taxi|gasolina|combust[ií]vel|estacionamento|ped[aá]gio|metro|metr[oô]|onibus|[oô]nibus)/i.test(lowerAll)) {
-            bestCategory = cat;
-            break;
-          }
-        } else if (catName.includes("moradia") || catName.includes("casa") || catName.includes("habitac")) {
-          if (/(aluguel|condom[ií]nio|luz|enel|agua|[aá]gua|sabesp|internet|iptu|gas|g[aá]s)/i.test(lowerAll)) {
-            bestCategory = cat;
-            break;
-          }
-        } else if (catName.includes("saude") || catName.includes("saúde")) {
-          if (/(farm[aá]cia|remedio|rem[eé]dio|consulta|m[eé]dico|dentista|exame|hospital)/i.test(lowerAll)) {
-            bestCategory = cat;
-            break;
-          }
-        } else if (catName.includes("lazer") || catName.includes("entreten")) {
-          if (/(cinema|streaming|netflix|spotify|jogo|bar|balada|passeio|viagem|show)/i.test(lowerAll)) {
-            bestCategory = cat;
-            break;
-          }
-        } else if (catName.includes("salario") || catName.includes("salário") || catName.includes("renda")) {
-          if (/(sal[aá]rio|rendimento|prolabore|freela|pagamento\s+recebido)/i.test(lowerAll)) {
-            bestCategory = cat;
-            break;
-          }
-        }
-      }
-    }
-  }
-
-  // Fallback to first available category of matching type
-  if (!bestCategory) {
-    bestCategory = categories.find((c) => c.type === detectedType);
-  }
-
-  // 7. Clean up remaining description
+  // 8. Clean up description
   let description = cleaned
     .replace(/[,\-:;]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 
-  // If description is empty or very short, use category name or a reasonable fallback
   if (!description || description.length < 2) {
-    description = bestCategory ? bestCategory.name : detectedType === "income" ? "Receita" : "Despesa";
+    description = matchedCat ? matchedCat.name : detectedType === "income" ? "Receita" : "Despesa";
   } else {
-    // Capitalize first letter
     description = description.charAt(0).toUpperCase() + description.slice(1);
   }
 
@@ -292,11 +235,12 @@ export function parseNaturalLanguage(text: string, categories: Category[]): Pars
     description,
     amountCents,
     type: detectedType,
-    categoryId: bestCategory?.id,
-    categoryName: bestCategory?.name,
+    categoryId: matchedCat?.id,
+    categoryName: matchedCat?.name,
     date: targetDate,
     isPaid,
     isRecurring,
     installments,
   };
 }
+
