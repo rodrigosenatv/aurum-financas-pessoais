@@ -1,0 +1,127 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink: #060807;
+  --color-panel: #0b0d0a;
+  --color-raise: #14170f;
+  --color-cream: #eef2e4;
+  --color-mute: #878d7c;
+  --color-faint: #5c6154;
+  --color-accent: #b6f244;
+  --color-deep: #233309;
+  --color-coral: #ff6e82;
+  --color-gold: #eccb6b;
+  --color-line: rgb(238 242 228 / 0.075);
+  --color-line-strong: rgb(238 242 228 / 0.14);
+  --font-display: var(--font-grotesk), "Space Grotesk", ui-sans-serif, system-ui;
+  --font-serif: var(--font-iserif), "Instrument Serif", Georgia, serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui;
+}
+
+html {
+  color-scheme: dark;
+  scroll-behavior: smooth;
+}
+
+body {
+  min-height: 100dvh;
+  background: var(--color-ink);
+  overflow-x: clip;
+}
+
+/* atmospheric glows */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(1100px 620px at 85% -12%, rgb(182 242 68 / 0.075), transparent 62%),
+    radial-gradient(820px 540px at -12% 108%, rgb(125 211 252 / 0.05), transparent 60%),
+    radial-gradient(700px 500px at 50% 120%, rgb(182 242 68 / 0.035), transparent 65%);
+}
+
+/* film grain */
+body::after {
+  content: "";
+  position: fixed;
+  inset: -50%;
+  z-index: 40;
+  pointer-events: none;
+  opacity: 0.032;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+::selection {
+  background: rgb(182 242 68 / 0.85);
+  color: #0a0c03;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #22281b transparent;
+}
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #22281b;
+  border-radius: 99px;
+}
+
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+input[type="date"] {
+  color-scheme: dark;
+}
+
+@layer components {
+  .card {
+    position: relative;
+    border: 1px solid var(--color-line);
+    border-radius: 22px;
+    background:
+      linear-gradient(160deg, rgb(238 242 228 / 0.032), rgb(238 242 228 / 0.006) 42%),
+      var(--color-panel);
+    box-shadow: 0 24px 60px -40px rgb(0 0 0 / 0.8);
+  }
+
+  .eyebrow {
+    font-size: 0.625rem;
+    font-weight: 600;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--color-faint);
+  }
+
+  .field {
+    width: 100%;
+    border-radius: 14px;
+    border: 1px solid var(--color-line);
+    background: rgb(6 8 7 / 0.6);
+    padding: 0.7rem 0.9rem;
+    font-size: 0.875rem;
+    color: var(--color-cream);
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+  .field::placeholder {
+    color: var(--color-faint);
+  }
+  .field:focus {
+    border-color: rgb(182 242 68 / 0.5);
+    box-shadow: 0 0 0 3px rgb(182 242 68 / 0.1);
+  }
+}
