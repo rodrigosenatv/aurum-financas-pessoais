@@ -2,19 +2,37 @@ import { db } from "@/db";
 import { categories, transactions } from "@/db/schema";
 import { and, desc, eq, like } from "drizzle-orm";
 
-export async function ensureRecurringForMonth(userId: number, targetMonth: string) {
+export interface RecurringPreview {
+  description: string;
+  amountCents: number;
+  type: "income" | "expense";
+  categoryId: number;
+  categoryName: string;
+  categoryIcon: string;
+  categoryColor: string;
+  date: string;
+}
+
+export async function getMissingRecurringForMonth(userId: number, targetMonth: string) {
   // targetMonth format: "YYYY-MM"
   const [yearStr, monthStr] = targetMonth.split("-");
   const year = Number(yearStr);
-  const month = Number(monthStr); // 1-indexed
+  const month = Number(monthStr);
 
   if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
-    return [];
+    return { missing: [], counts: { expenses: 0, income: 0, total: 0 } };
   }
 
   const daysInMonth = new Date(year, month, 0).getDate();
 
-  // 1. Fetch all distinct recurring templates/items defined by this user
+  // 1. Fetch user categories map
+  const userCats = await db
+    .select()
+    .from(categories)
+    .where(eq(categories.userId, userId));
+  const catMap = new Map(userCats.map((c) => [c.id, c]));
+
+  // 2. Fetch distinct master templates defined by this user
   const userRecurring = await db
     .select({
       description: transactions.description,
@@ -23,15 +41,16 @@ export async function ensureRecurringForMonth(userId: number, targetMonth: strin
       categoryId: transactions.categoryId,
       date: transactions.date,
       seriesId: transactions.seriesId,
-      installmentTotal: transactions.installmentTotal,
     })
     .from(transactions)
     .where(and(eq(transactions.userId, userId), eq(transactions.isRecurring, true)))
     .orderBy(desc(transactions.date), desc(transactions.id));
 
-  if (userRecurring.length === 0) return [];
+  if (userRecurring.length === 0) {
+    return { missing: [], counts: { expenses: 0, income: 0, total: 0 } };
+  }
 
-  // Group by unique description + type + categoryId to get the latest master template
+  // Deduplicate to get the latest unique template per description+type+categoryId
   const templatesMap = new Map<string, (typeof userRecurring)[0]>();
   for (const item of userRecurring) {
     const key = `${item.type}:${item.categoryId}:${item.description.trim().toLowerCase()}`;
@@ -40,7 +59,7 @@ export async function ensureRecurringForMonth(userId: number, targetMonth: strin
     }
   }
 
-  // 2. Fetch existing transactions in the target month for this user
+  // 3. Fetch existing transactions in target month
   const existingInMonth = await db
     .select({
       description: transactions.description,
@@ -54,33 +73,66 @@ export async function ensureRecurringForMonth(userId: number, targetMonth: strin
     existingInMonth.map((t) => `${t.type}:${t.categoryId}:${t.description.trim().toLowerCase()}`),
   );
 
-  // 3. Identify which recurring templates are missing in the target month
-  const toInsert: (typeof transactions.$inferInsert)[] = [];
+  // 4. Identify missing items
+  const missing: RecurringPreview[] = [];
   const pad = (n: number) => String(n).padStart(2, "0");
+
+  let expensesCount = 0;
+  let incomeCount = 0;
 
   for (const [key, tpl] of templatesMap.entries()) {
     if (!existingKeys.has(key)) {
-      // Extract original day from tpl.date
       const origDay = Number(tpl.date.split("-")[2]) || 10;
       const day = Math.min(Math.max(1, origDay), daysInMonth);
       const newDate = `${targetMonth}-${pad(day)}`;
+      const cat = catMap.get(tpl.categoryId);
 
-      toInsert.push({
-        userId,
+      if (tpl.type === "expense") expensesCount++;
+      else incomeCount++;
+
+      missing.push({
         description: tpl.description,
         amountCents: tpl.amountCents,
-        type: tpl.type,
+        type: tpl.type as "income" | "expense",
         categoryId: tpl.categoryId,
+        categoryName: cat?.name ?? "Geral",
+        categoryIcon: cat?.icon ?? "Wallet",
+        categoryColor: cat?.color ?? "#B7F34B",
         date: newDate,
-        isPaid: false, // In a new month, defaults to pending payment
-        isRecurring: true,
-        seriesId: tpl.seriesId ?? null,
       });
     }
   }
 
-  if (toInsert.length === 0) return [];
+  return {
+    missing,
+    counts: {
+      expenses: expensesCount,
+      income: incomeCount,
+      total: missing.length,
+    },
+  };
+}
 
-  const created = await db.insert(transactions).values(toInsert).returning();
+export async function importRecurringForMonth(userId: number, targetMonth: string) {
+  const { missing } = await getMissingRecurringForMonth(userId, targetMonth);
+  if (missing.length === 0) return [];
+
+  const toInsert = missing.map((item) => ({
+    userId,
+    description: item.description,
+    amountCents: item.amountCents,
+    type: item.type,
+    categoryId: item.categoryId,
+    date: item.date,
+    isPaid: false, // Default to pending payment for new month
+    isRecurring: true,
+  }));
+
+  const created = await db
+    .insert(transactions)
+    .values(toInsert)
+    .returning({ id: transactions.id });
+
   return created;
 }
+

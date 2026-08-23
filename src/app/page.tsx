@@ -6,15 +6,7 @@ import { getCurrentUser } from "@/lib/auth";
 import type { FinanceData } from "@/lib/types";
 import { desc, eq } from "drizzle-orm";
 
-import { ensureRecurringForMonth } from "@/lib/recurring";
-
-export const dynamic = "force-dynamic";
-
 async function loadData(userId: number): Promise<FinanceData> {
-  const now = new Date();
-  const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  await ensureRecurringForMonth(userId, currentMonthKey).catch((e) => console.error("Recurring sync error:", e));
-
   const [cats, txns, bds, gls] = await Promise.all([
     db.select().from(categories).where(eq(categories.userId, userId)).orderBy(categories.id),
     db

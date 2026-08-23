@@ -24,12 +24,14 @@ export function TransactionsView({
   onEdit,
   onDelete,
   onTogglePaid,
+  onImportRecurring,
 }: {
   data: FinanceData;
   month: { y: number; m: number };
   onEdit: (t: TransactionDTO) => void;
   onDelete: (id: number) => Promise<void>;
   onTogglePaid: (id: number, currentPaid: boolean) => Promise<void>;
+  onImportRecurring?: () => Promise<void>;
 }) {
   const key = monthKey(month.y, month.m);
   const [query, setQuery] = useState("");
@@ -38,8 +40,40 @@ export function TransactionsView({
   const [catFilter, setCatFilter] = useState<string>("all");
   const [deleting, setDeleting] = useState<number | null>(null);
   const [toggling, setToggling] = useState<number | null>(null);
+  const [importing, setImporting] = useState(false);
   const [pagination, setPagination] = useState({ key, page: 1 });
   const pageSize = 40;
+
+  // Compute missing recurring items available to import for this month
+  const missingRecurring = useMemo(() => {
+    const userRecurring = data.transactions.filter((t) => t.isRecurring);
+    if (userRecurring.length === 0) return [];
+
+    const templatesMap = new Map<string, TransactionDTO>();
+    for (const item of userRecurring) {
+      const k = `${item.type}:${item.categoryId}:${item.description.trim().toLowerCase()}`;
+      if (!templatesMap.has(k)) {
+        templatesMap.set(k, item);
+      }
+    }
+
+    const currentMonthKeys = new Set(
+      data.transactions
+        .filter((t) => keyFromISO(t.date) === key)
+        .map((t) => `${t.type}:${t.categoryId}:${t.description.trim().toLowerCase()}`),
+    );
+
+    const available: TransactionDTO[] = [];
+    for (const [k, tpl] of templatesMap.entries()) {
+      if (!currentMonthKeys.has(k)) {
+        available.push(tpl);
+      }
+    }
+    return available;
+  }, [data.transactions, key]);
+
+  const missingExpensesCount = missingRecurring.filter((t) => t.type === "expense").length;
+  const missingIncomeCount = missingRecurring.filter((t) => t.type === "income").length;
 
   const monthTxns = useMemo(
     () => data.transactions.filter((t) => keyFromISO(t.date) === key),
@@ -83,11 +117,24 @@ export function TransactionsView({
   }, [visible]);
 
   const income = filtered.reduce((s, t) => (t.type === "income" ? s + t.amountCents : s), 0);
+  const paidIncome = filtered.reduce((s, t) => (t.type === "income" && t.isPaid ? s + t.amountCents : s), 0);
+  const pendingIncome = filtered.reduce((s, t) => (t.type === "income" && !t.isPaid ? s + t.amountCents : s), 0);
+
   const expense = filtered.reduce((s, t) => (t.type === "expense" ? s + t.amountCents : s), 0);
   const paidExpense = filtered.reduce((s, t) => (t.type === "expense" && t.isPaid ? s + t.amountCents : s), 0);
   const pendingExpense = filtered.reduce((s, t) => (t.type === "expense" && !t.isPaid ? s + t.amountCents : s), 0);
 
   const hasFilters = query !== "" || typeFilter !== "all" || catFilter !== "all" || statusFilter !== "all";
+
+  const handleImport = async () => {
+    if (!onImportRecurring) return;
+    setImporting(true);
+    try {
+      await onImportRecurring();
+    } finally {
+      setImporting(false);
+    }
+  };
 
   const remove = async (id: number) => {
     setDeleting(id);
@@ -110,6 +157,36 @@ export function TransactionsView({
 
   return (
     <div className="space-y-4">
+      {/* Banner de Importação de Fixos */}
+      {missingRecurring.length > 0 && onImportRecurring && (
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-accent/30 bg-accent/[0.07] p-4.5 text-cream backdrop-blur-md shadow-[0_10px_35px_-15px_rgba(182,242,68,0.2)]">
+          <div className="flex items-center gap-3">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-accent text-ink">
+              <Repeat2 size={20} strokeWidth={2.4} />
+            </span>
+            <div>
+              <p className="font-display text-[14.5px] font-semibold text-cream">
+                Lançamentos Fixos Prontos para Importar
+              </p>
+              <p className="text-[12px] text-faint">
+                {missingExpensesCount > 0 && `${missingExpensesCount} despesa${missingExpensesCount > 1 ? "s" : ""}`}
+                {missingExpensesCount > 0 && missingIncomeCount > 0 && " e "}
+                {missingIncomeCount > 0 && `${missingIncomeCount} receita${missingIncomeCount > 1 ? "s" : ""}`} disponíveis para o mês selecionado.
+              </p>
+            </div>
+          </div>
+
+          <button
+            disabled={importing}
+            onClick={() => void handleImport()}
+            className="flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-xs font-bold text-ink shadow-[0_10px_25px_-5px_rgba(182,242,68,0.4)] hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50"
+          >
+            <Repeat2 size={14} className={importing ? "animate-spin" : ""} strokeWidth={2.4} />
+            {importing ? "Importando..." : "Importar Fixos do Mês"}
+          </button>
+        </div>
+      )}
+
       {/* summary strip */}
       <div className="card flex flex-wrap items-center gap-x-8 gap-y-3 px-6 py-4">
         <div>
@@ -118,20 +195,18 @@ export function TransactionsView({
         </div>
         <div className="h-8 w-px bg-line" />
         <div>
-          <p className="eyebrow mb-1">Entradas</p>
+          <p className="eyebrow mb-1">Entradas Total</p>
           <p className="font-display text-[17px] font-semibold tabular-nums text-accent">{fmt(income)}</p>
+          <p className="text-[10px] text-faint mt-0.5">{fmt(paidIncome)} recebidas</p>
         </div>
         <div>
           <p className="eyebrow mb-1">Despesas Total</p>
           <p className="font-display text-[17px] font-semibold tabular-nums text-coral">{fmt(expense)}</p>
+          <p className="text-[10px] text-faint mt-0.5">{fmt(paidExpense)} pagas</p>
         </div>
         <div className="h-8 w-px bg-line" />
         <div>
-          <p className="eyebrow mb-1">Pagas (Liquidadas)</p>
-          <p className="font-display text-[17px] font-semibold tabular-nums text-accent">{fmt(paidExpense)}</p>
-        </div>
-        <div>
-          <p className="eyebrow mb-1">Pendentes (A Pagar)</p>
+          <p className="eyebrow mb-1">Pendentes a Pagar</p>
           <p
             className={`font-display text-[17px] font-semibold tabular-nums ${
               pendingExpense > 0 ? "text-amber-400" : "text-faint"
@@ -139,6 +214,7 @@ export function TransactionsView({
           >
             {fmt(pendingExpense)}
           </p>
+          <p className="text-[10px] text-faint mt-0.5">{pendingCount} contas</p>
         </div>
         <div className="h-8 w-px bg-line" />
         <div>
@@ -148,6 +224,9 @@ export function TransactionsView({
             style={{ color: income - expense >= 0 ? "#b6f244" : "#ff6e82" }}
           >
             {fmt(income - expense)}
+          </p>
+          <p className="text-[10px] text-faint mt-0.5">
+            Realizado: <span className="font-semibold">{fmt(paidIncome - paidExpense)}</span>
           </p>
         </div>
       </div>

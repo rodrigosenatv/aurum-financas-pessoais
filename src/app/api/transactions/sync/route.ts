@@ -2,12 +2,33 @@ import { db } from "@/db";
 import { categories, transactions } from "@/db/schema";
 import { apiError, readJson } from "@/lib/api";
 import { requireUser } from "@/lib/auth";
-import { ensureRecurringForMonth } from "@/lib/recurring";
+import { getMissingRecurringForMonth, importRecurringForMonth } from "@/lib/recurring";
 import { and, desc, eq, like } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 const MONTH_RE = /^\d{4}-\d{2}$/;
 
+// GET /api/transactions/sync?month=YYYY-MM
+// Returns preview of missing recurring items without modifying the database
+export async function GET(request: Request) {
+  try {
+    const user = await requireUser();
+    const { searchParams } = new URL(request.url);
+    const month = searchParams.get("month") || "";
+
+    if (!MONTH_RE.test(month)) {
+      return NextResponse.json({ error: "Mês inválido." }, { status: 400 });
+    }
+
+    const preview = await getMissingRecurringForMonth(user.id, month);
+    return NextResponse.json(preview);
+  } catch (error) {
+    return apiError(error);
+  }
+}
+
+// POST /api/transactions/sync
+// Imports recurring items when user explicitly confirms
 export async function POST(request: Request) {
   try {
     const user = await requireUser();
@@ -18,8 +39,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Mês inválido." }, { status: 400 });
     }
 
-    // Ensure recurring transactions are generated for this month
-    await ensureRecurringForMonth(user.id, month);
+    // Explicit manual import
+    if (body?.action === "import") {
+      await importRecurringForMonth(user.id, month);
+    }
 
     // Fetch transactions in this month
     const rows = await db
@@ -68,3 +91,4 @@ export async function POST(request: Request) {
     return apiError(error);
   }
 }
+

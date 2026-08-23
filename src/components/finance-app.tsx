@@ -168,15 +168,17 @@ export function FinanceApp({ initialData, user }: { initialData: FinanceData; us
     [],
   );
 
-  const changeMonth = useCallback(
-    async (target: { y: number; m: number }) => {
-      setMonth(target);
-      const targetKey = monthKey(target.y, target.m);
+  const changeMonth = useCallback((target: { y: number; m: number }) => {
+    setMonth(target);
+  }, []);
+
+  const importRecurring = useCallback(
+    async (targetKey: string) => {
       try {
         const synced = await requestJson<TransactionDTO[]>("/api/transactions/sync", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ month: targetKey }),
+          body: JSON.stringify({ month: targetKey, action: "import" }),
         });
         if (synced && Array.isArray(synced) && synced.length > 0) {
           setData((current) => {
@@ -192,7 +194,8 @@ export function FinanceApp({ initialData, user }: { initialData: FinanceData; us
           });
         }
       } catch (e) {
-        console.error("Erro ao sincronizar gastos fixos do mês:", e);
+        console.error("Erro ao importar gastos fixos do mês:", e);
+        throw e;
       }
     },
     [],
@@ -511,6 +514,7 @@ export function FinanceApp({ initialData, user }: { initialData: FinanceData; us
                   onTogglePaid={togglePaid}
                   onEditBudget={editBudget}
                   onDepositGoal={depositGoal}
+                  onImportRecurring={() => importRecurring(key)}
                 />
               ) : view === "transactions" ? (
                 <TransactionsView
@@ -519,6 +523,7 @@ export function FinanceApp({ initialData, user }: { initialData: FinanceData; us
                   onEdit={openEdit}
                   onDelete={deleteTxn}
                   onTogglePaid={togglePaid}
+                  onImportRecurring={() => importRecurring(key)}
                 />
               ) : (
                 <ManageView

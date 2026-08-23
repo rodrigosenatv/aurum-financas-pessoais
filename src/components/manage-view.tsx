@@ -455,7 +455,7 @@ export function ManageView({
               <h2 className="font-display text-base font-semibold text-cream">Gastos & Receitas Fixas Recorrentes</h2>
             </div>
             <p className="mt-1 text-xs text-faint">
-              Lançamentos cadastrados como fixos são recriados automaticamente a cada novo mês no dia agendado.
+              Lançamentos cadastrados como fixos ficam disponíveis como modelo e podem ser importados para o mês com 1 clique sempre que você solicitar.
             </p>
           </div>
           <div className="text-right">

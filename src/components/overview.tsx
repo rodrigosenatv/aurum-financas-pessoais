@@ -90,6 +90,7 @@ export function Overview({
   onTogglePaid,
   onEditBudget,
   onDepositGoal,
+  onImportRecurring,
 }: {
   data: FinanceData;
   month: { y: number; m: number };
@@ -98,6 +99,7 @@ export function Overview({
   onTogglePaid: (id: number, currentPaid: boolean) => Promise<void>;
   onEditBudget: (b: BudgetDTO, amountCents: number) => Promise<void>;
   onDepositGoal: (id: number, addCents: number) => Promise<void>;
+  onImportRecurring?: () => Promise<void>;
 }) {
   const key = monthKey(month.y, month.m);
   const [activeSlice, setActiveSlice] = useState<string | null>(null);
@@ -106,14 +108,55 @@ export function Overview({
   const [depositId, setDepositId] = useState<number | null>(null);
   const [depositInput, setDepositInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [togglingId, setTogglingId] = useState<number | null>(null);
 
   const catById = useMemo(() => new Map(data.categories.map((c) => [c.id, c])), [data.categories]);
+
+  // Compute missing recurring items available to import for this month
+  const missingRecurring = useMemo(() => {
+    const userRecurring = data.transactions.filter((t) => t.isRecurring);
+    if (userRecurring.length === 0) return [];
+
+    const templatesMap = new Map<string, TransactionDTO>();
+    for (const item of userRecurring) {
+      const k = `${item.type}:${item.categoryId}:${item.description.trim().toLowerCase()}`;
+      if (!templatesMap.has(k)) {
+        templatesMap.set(k, item);
+      }
+    }
+
+    const currentMonthKeys = new Set(
+      data.transactions
+        .filter((t) => keyFromISO(t.date) === key)
+        .map((t) => `${t.type}:${t.categoryId}:${t.description.trim().toLowerCase()}`),
+    );
+
+    const available: TransactionDTO[] = [];
+    for (const [k, tpl] of templatesMap.entries()) {
+      if (!currentMonthKeys.has(k)) {
+        available.push(tpl);
+      }
+    }
+    return available;
+  }, [data.transactions, key]);
+
+  const missingExpensesCount = missingRecurring.filter((t) => t.type === "expense").length;
+  const missingIncomeCount = missingRecurring.filter((t) => t.type === "income").length;
 
   const m = useMemo(() => {
     const monthTxns = data.transactions.filter((t) => keyFromISO(t.date) === key);
     const income = monthTxns.reduce((s, t) => (t.type === "income" ? s + t.amountCents : s), 0);
     const expense = monthTxns.reduce((s, t) => (t.type === "expense" ? s + t.amountCents : s), 0);
+
+    const paidIncome = monthTxns.reduce(
+      (s, t) => (t.type === "income" && t.isPaid ? s + t.amountCents : s),
+      0,
+    );
+    const pendingIncome = monthTxns.reduce(
+      (s, t) => (t.type === "income" && !t.isPaid ? s + t.amountCents : s),
+      0,
+    );
 
     const paidExpense = monthTxns.reduce(
       (s, t) => (t.type === "expense" && t.isPaid ? s + t.amountCents : s),
@@ -130,14 +173,18 @@ export function Overview({
     const prevIncome = prevTxns.reduce((s, t) => (t.type === "income" ? s + t.amountCents : s), 0);
     const prevExpense = prevTxns.reduce((s, t) => (t.type === "expense" ? s + t.amountCents : s), 0);
 
-    // balance & flow
-    let balance = 0;
-    const netByKey = new Map<string, number>();
+    // Saldo Realizado (Apenas o que foi pago/recebido até o mês selecionado)
+    let realizedBalance = 0;
+    const realizedNetByKey = new Map<string, number>();
     for (const t of data.transactions) {
+      if (!t.isPaid) continue;
       const k = keyFromISO(t.date);
-      netByKey.set(k, (netByKey.get(k) ?? 0) + (t.type === "income" ? t.amountCents : -t.amountCents));
-      if (k <= key) balance += t.type === "income" ? t.amountCents : -t.amountCents;
+      realizedNetByKey.set(k, (realizedNetByKey.get(k) ?? 0) + (t.type === "income" ? t.amountCents : -t.amountCents));
+      if (k <= key) realizedBalance += t.type === "income" ? t.amountCents : -t.amountCents;
     }
+
+    // Saldo Previsto ao fim do mês: Saldo Realizado + Pendências do Mês
+    const projectedBalance = realizedBalance + (pendingIncome - pendingExpense);
 
     const flow: FlowPoint[] = [];
     const balanceSeries: number[] = [];
@@ -149,7 +196,7 @@ export function Overview({
     let rolling = 0;
     for (let i = 11; i >= 0; i--) {
       const d = shiftMonth(month.y, month.m, -i);
-      rolling += netByKey.get(monthKey(d.y, d.m)) ?? 0;
+      rolling += realizedNetByKey.get(monthKey(d.y, d.m)) ?? 0;
       if (i < 6) balanceSeries.push(rolling);
     }
     for (let i = 5; i >= 0; i--) {
@@ -181,11 +228,14 @@ export function Overview({
       monthTxns,
       income,
       expense,
+      paidIncome,
+      pendingIncome,
       paidExpense,
       pendingExpense,
       prevIncome,
       prevExpense,
-      balance,
+      realizedBalance,
+      projectedBalance,
       flow,
       balanceSeries,
       spendByCat,
@@ -209,6 +259,16 @@ export function Overview({
   }, [m.sorted, catById]);
 
   const recent = m.monthTxns.slice(0, 7);
+
+  const handleImport = async () => {
+    if (!onImportRecurring) return;
+    setImporting(true);
+    try {
+      await onImportRecurring();
+    } finally {
+      setImporting(false);
+    }
+  };
 
   const submitBudget = async (b: BudgetDTO) => {
     const cents = parseAmount(budgetInput);
@@ -247,23 +307,65 @@ export function Overview({
 
   return (
     <div className="space-y-4">
+      {/* ----------------- Banner Importar Fixos do Mês ----------------- */}
+      {missingRecurring.length > 0 && onImportRecurring && (
+        <Item i={-0.5}>
+          <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-accent/30 bg-accent/[0.07] p-4.5 text-cream backdrop-blur-md shadow-[0_10px_35px_-15px_rgba(182,242,68,0.2)]">
+            <div className="flex items-center gap-3">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-accent text-ink">
+                <Repeat2 size={20} strokeWidth={2.4} />
+              </span>
+              <div>
+                <p className="font-display text-[14.5px] font-semibold text-cream">
+                  Lançamentos Fixos Disponíveis para Este Mês
+                </p>
+                <p className="text-[12px] text-faint">
+                  Você possui{" "}
+                  <strong className="text-accent font-semibold">
+                    {missingExpensesCount > 0 && `${missingExpensesCount} despesa${missingExpensesCount > 1 ? "s" : ""}`}
+                    {missingExpensesCount > 0 && missingIncomeCount > 0 && " e "}
+                    {missingIncomeCount > 0 && `${missingIncomeCount} receita${missingIncomeCount > 1 ? "s" : ""}`}
+                  </strong>{" "}
+                  recorrente{missingRecurring.length > 1 ? "s" : ""} pronta{missingRecurring.length > 1 ? "s" : ""} para importar.
+                </p>
+              </div>
+            </div>
+
+            <button
+              disabled={importing}
+              onClick={() => void handleImport()}
+              className="flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-xs font-bold text-ink shadow-[0_10px_25px_-5px_rgba(182,242,68,0.4)] hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50"
+            >
+              <Repeat2 size={14} className={importing ? "animate-spin" : ""} strokeWidth={2.4} />
+              {importing ? "Importando..." : "Importar Lançamentos Fixos"}
+            </button>
+          </div>
+        </Item>
+      )}
+
       {/* ------------------------------ KPI row ----------------------------- */}
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4 xl:gap-4">
         <Item i={0} className="col-span-2 xl:col-span-1">
           <div className="relative h-full overflow-hidden rounded-[22px] bg-[linear-gradient(140deg,#cdf96f,#a9e22c)] p-5 text-ink shadow-[0_20px_70px_-30px_rgba(182,242,68,0.45)]">
             <div className="flex items-start justify-between">
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ink/55">Saldo acumulado</p>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ink/65">Saldo em Caixa</p>
+                <p className="text-[10px] font-medium text-ink/50">realizado em conta</p>
+              </div>
               <span className="grid h-8 w-8 place-items-center rounded-lg bg-ink/10">
                 <Wallet size={15} strokeWidth={2.2} />
               </span>
             </div>
-            <p className="mt-4 font-display text-[clamp(1.9rem,2.6vw,2.5rem)] font-semibold leading-none tracking-tight">
-              <Money cents={m.balance} />
+            <p className="mt-3 font-display text-[clamp(1.8rem,2.5vw,2.3rem)] font-semibold leading-none tracking-tight">
+              <Money cents={m.realizedBalance} />
             </p>
-            <div className="mt-4 -mb-1 text-ink">
-              <Sparkline values={m.balanceSeries} color="#233309" height={40} />
+            <div className="mt-2.5 flex items-center justify-between text-[11px] font-semibold text-ink/75 bg-ink/10 rounded-lg px-2.5 py-1">
+              <span>Previsto fim do mês:</span>
+              <span className="tabular-nums font-bold">{fmt(m.projectedBalance)}</span>
             </div>
-            <p className="mt-1 text-[11px] font-medium text-ink/55">evolução dos últimos 6 meses</p>
+            <div className="mt-2.5 -mb-1 text-ink">
+              <Sparkline values={m.balanceSeries} color="#233309" height={36} />
+            </div>
           </div>
         </Item>
 
@@ -278,8 +380,11 @@ export function Overview({
             <p className="mt-4 font-display text-[clamp(1.5rem,2vw,1.9rem)] font-semibold leading-none tracking-tight text-cream">
               <Money cents={m.income} />
             </p>
-            <div className="mt-3">
-              <Delta value={m.prevIncome > 0 ? ((m.income - m.prevIncome) / m.prevIncome) * 100 : null} />
+            <div className="mt-2.5 flex items-center justify-between text-[11px]">
+              <span className="text-accent font-medium">{fmt(m.paidIncome)} recebidas</span>
+              <span className={m.pendingIncome > 0 ? "text-amber-400 font-medium" : "text-faint"}>
+                {m.pendingIncome > 0 ? `${fmt(m.pendingIncome)} a receber` : "total recebido"}
+              </span>
             </div>
           </div>
         </Item>
@@ -318,7 +423,7 @@ export function Overview({
                 {fmt(Math.max(0, m.income - m.expense))} guardados
               </p>
               <p className="mt-1 flex items-center gap-1.5 text-[11px] text-faint">
-                <PiggyBank size={12} /> do que entrou este mês
+                <PiggyBank size={12} /> balanço do mês
               </p>
             </div>
           </div>
