@@ -13,7 +13,6 @@ import {
   LogOut,
   Plus,
   Settings2,
-  Sprout,
   Target,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -24,6 +23,7 @@ import { ManageView } from "./manage-view";
 import { Overview } from "./overview";
 import { TransactionModal } from "./transaction-modal";
 import { TransactionsView } from "./transactions-view";
+import { AurumLogo } from "./logo";
 
 type View = "overview" | "transactions" | "manage";
 
@@ -302,16 +302,8 @@ export function FinanceApp({ initialData, user }: { initialData: FinanceData; us
     <div className="relative z-10 mx-auto flex min-h-dvh w-full max-w-[1500px] items-start">
       {/* ------------------------------ sidebar ----------------------------- */}
       <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-line px-5 py-7 lg:flex">
-        <div className="flex items-center gap-2.5 px-1">
-          <span className="grid h-9 w-9 place-items-center rounded-xl bg-accent text-ink shadow-[0_0_28px_-4px_rgba(182,242,68,0.55)]">
-            <Sprout size={18} strokeWidth={2.2} />
-          </span>
-          <div>
-            <p className="font-display text-[17px] font-bold leading-none tracking-tight">aurum</p>
-            <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.18em] text-faint">
-              finanças pessoais
-            </p>
-          </div>
+        <div className="px-1">
+          <AurumLogo size={36} />
         </div>
 
         <nav className="mt-10 space-y-1">
@@ -402,12 +394,7 @@ export function FinanceApp({ initialData, user }: { initialData: FinanceData; us
         <header className="sticky top-0 z-30 border-b border-line bg-ink/78 backdrop-blur-xl">
           {/* mobile bar */}
           <div className="flex items-center justify-between px-4 pt-4 lg:hidden">
-            <div className="flex items-center gap-2">
-              <span className="grid h-8 w-8 place-items-center rounded-lg bg-accent text-ink">
-                <Sprout size={16} strokeWidth={2.2} />
-              </span>
-              <p className="font-display text-[16px] font-bold tracking-tight">aurum</p>
-            </div>
+            <AurumLogo size={32} sublabel={false} />
             <button
               onClick={openNew}
               aria-label="Nova transação"

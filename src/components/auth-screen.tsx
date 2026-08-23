@@ -1,8 +1,9 @@
 "use client";
 
-import { LoaderCircle, Sprout } from "lucide-react";
+import { LoaderCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { AurumLogo } from "./logo";
 
 export function AuthScreen({ databaseError }: { databaseError?: string }) {
   const router = useRouter();
@@ -34,14 +35,8 @@ export function AuthScreen({ databaseError }: { databaseError?: string }) {
   return (
     <main className="relative z-10 grid min-h-dvh place-items-center px-4 py-12">
       <section className="card w-full max-w-[430px] p-7 sm:p-9">
-        <div className="mb-8 flex items-center gap-3">
-          <span className="grid h-11 w-11 place-items-center rounded-2xl bg-accent text-ink">
-            <Sprout size={21} strokeWidth={2.4} />
-          </span>
-          <div>
-            <h1 className="font-display text-xl font-bold tracking-tight">aurum</h1>
-            <p className="text-[11px] uppercase tracking-[0.18em] text-faint">finanças pessoais</p>
-          </div>
+        <div className="mb-8">
+          <AurumLogo size={42} />
         </div>
         <p className="eyebrow mb-2">{register ? "comece agora" : "bem-vindo de volta"}</p>
         <h2 className="font-serif text-3xl text-cream">
