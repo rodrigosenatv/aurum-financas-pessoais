@@ -255,6 +255,29 @@ export function FinanceApp({ initialData, user }: { initialData: FinanceData; us
     });
     setData((current) => ({ ...current, categories: [...current.categories, created] }));
   };
+  const updateCategory = async (id: number, input: Partial<Omit<CategoryDTO, "id">>) => {
+    const updated = await requestJson<CategoryDTO>(`/api/categories/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    setData((current) => ({
+      ...current,
+      categories: current.categories.map((item) => (item.id === id ? updated : item)),
+      transactions: current.transactions.map((t) =>
+        t.categoryId === id
+          ? {
+              ...t,
+              category: {
+                name: updated.name,
+                icon: updated.icon,
+                color: updated.color,
+              },
+            }
+          : t,
+      ),
+    }));
+  };
   const deleteCategory = async (id: number) => {
     await requestJson(`/api/categories/${id}`, { method: "DELETE" });
     setData((current) => ({ ...current, categories: current.categories.filter((item) => item.id !== id) }));
@@ -526,6 +549,7 @@ export function FinanceApp({ initialData, user }: { initialData: FinanceData; us
                   data={data}
                   user={user}
                   onCreateCategory={createCategory}
+                  onUpdateCategory={updateCategory}
                   onDeleteCategory={deleteCategory}
                   onCreateBudget={createBudget}
                   onDeleteBudget={deleteBudget}

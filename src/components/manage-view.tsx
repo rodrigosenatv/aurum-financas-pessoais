@@ -4,11 +4,13 @@ import {
   Bell,
   Bot,
   Camera,
+  Check,
   CheckCircle2,
   Copy,
   ExternalLink,
   LoaderCircle,
   Mic,
+  Pencil,
   Plus,
   RefreshCw,
   Repeat2,
@@ -16,20 +18,40 @@ import {
   Sparkles,
   Trash2,
   Wallet,
+  X,
   Zap,
 } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 import { fmt, parseAmount } from "@/lib/format";
-import { CategoryIcon } from "@/lib/icons";
-import type { FinanceData, TxnType, UserDTO } from "@/lib/types";
+import { BareIcon, CategoryIcon, ICON_MAP } from "@/lib/icons";
+import type { CategoryDTO, FinanceData, TxnType, UserDTO } from "@/lib/types";
 
 type CategoryInput = { name: string; icon: string; color: string; type: TxnType };
 type GoalInput = { name: string; targetCents: number; color: string; icon: string };
+
+const PRESET_COLORS = [
+  "#b6f244",
+  "#ff6e82",
+  "#38bdf8",
+  "#a78bfa",
+  "#f59e0b",
+  "#10b981",
+  "#ec4899",
+  "#06b6d4",
+  "#f97316",
+  "#eab308",
+  "#6366f1",
+  "#14b8a6",
+];
+
+const AVAILABLE_ICONS = Object.keys(ICON_MAP);
 
 export function ManageView({
   data,
   user,
   onCreateCategory,
+  onUpdateCategory,
   onDeleteCategory,
   onCreateBudget,
   onDeleteBudget,
@@ -40,6 +62,7 @@ export function ManageView({
   data: FinanceData;
   user?: UserDTO;
   onCreateCategory: (input: CategoryInput) => Promise<void>;
+  onUpdateCategory?: (id: number, input: Partial<CategoryInput>) => Promise<void>;
   onDeleteCategory: (id: number) => Promise<void>;
   onCreateBudget: (categoryId: number, amountCents: number) => Promise<void>;
   onDeleteBudget: (id: number) => Promise<void>;
@@ -48,6 +71,14 @@ export function ManageView({
   onTogglePaid?: (id: number, currentPaid: boolean) => Promise<void>;
 }) {
   const [category, setCategory] = useState<CategoryInput>({
+    name: "",
+    icon: "Wallet",
+    color: "#B7F34B",
+    type: "expense",
+  });
+  const [showCreateIconPicker, setShowCreateIconPicker] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<CategoryDTO | null>(null);
+  const [editCategoryForm, setEditCategoryForm] = useState<CategoryInput>({
     name: "",
     icon: "Wallet",
     color: "#B7F34B",
@@ -515,57 +546,132 @@ export function ManageView({
 
       {/* Categorias */}
       <section className="card card-pad">
-        <div className="mb-5">
-          <h2 className="font-display text-base font-semibold">Categorias</h2>
-          <p className="mt-1 text-xs text-faint">Organize receitas e despesas com suas próprias categorias.</p>
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-display text-base font-semibold">Categorias</h2>
+            <p className="mt-1 text-xs text-faint">Organize receitas e despesas com suas próprias categorias personalizadas.</p>
+          </div>
+          <span className="text-xs text-faint">{data.categories.length} cadastradas</span>
         </div>
-        <div className="grid gap-2 grid-cols-1 xs:grid-cols-2 lg:grid-cols-[1fr_140px_72px_auto]">
-          <input
-            className="field"
-            placeholder="Nome da categoria"
-            value={category.name}
-            onChange={(event) => setCategory((value) => ({ ...value, name: event.target.value }))}
-          />
-          <select
-            className="field"
-            value={category.type}
-            onChange={(event) => setCategory((value) => ({ ...value, type: event.target.value as TxnType }))}
-          >
-            <option value="expense">Despesa</option>
-            <option value="income">Receita</option>
-          </select>
-          <input
-            aria-label="Cor"
-            type="color"
-            className="field h-11 w-full !p-1.5 cursor-pointer"
-            value={category.color}
-            onChange={(event) => setCategory((value) => ({ ...value, color: event.target.value }))}
-          />
-          <button
-            disabled={busy !== null || category.name.trim().length < 2}
-            onClick={() => void run("category-new", () => onCreateCategory(category), () => setCategory((value) => ({ ...value, name: "" })))}
-            className="xs:col-span-2 lg:col-span-1 flex items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-ink disabled:opacity-30 min-h-[44px]"
-          >
-            {busy === "category-new" ? <LoaderCircle size={15} className="animate-spin" /> : <Plus size={15} />}
-            Adicionar
-          </button>
+
+        {/* Formulário de Criação Rápida */}
+        <div className="space-y-3">
+          <div className="grid gap-2 grid-cols-1 xs:grid-cols-2 lg:grid-cols-[1fr_130px_48px_48px_auto]">
+            <input
+              className="field"
+              placeholder="Nome da categoria..."
+              value={category.name}
+              onChange={(event) => setCategory((value) => ({ ...value, name: event.target.value }))}
+            />
+            <select
+              className="field"
+              value={category.type}
+              onChange={(event) => setCategory((value) => ({ ...value, type: event.target.value as TxnType }))}
+            >
+              <option value="expense">Despesa</option>
+              <option value="income">Receita</option>
+            </select>
+            <button
+              type="button"
+              onClick={() => setShowCreateIconPicker((v) => !v)}
+              title="Escolher Ícone"
+              className={`grid h-11 w-full place-items-center rounded-xl border transition-colors min-h-[44px] ${
+                showCreateIconPicker
+                  ? "border-accent bg-accent/15 text-accent"
+                  : "border-line bg-cream/[0.02] text-mute hover:border-line-strong hover:text-cream"
+              }`}
+            >
+              <BareIcon icon={category.icon} size={18} />
+            </button>
+            <input
+              aria-label="Cor"
+              type="color"
+              className="field h-11 w-full !p-1.5 cursor-pointer"
+              value={category.color}
+              onChange={(event) => setCategory((value) => ({ ...value, color: event.target.value }))}
+            />
+            <button
+              disabled={busy !== null || category.name.trim().length < 2}
+              onClick={() =>
+                void run("category-new", () => onCreateCategory(category), () => {
+                  setCategory((value) => ({ ...value, name: "" }));
+                  setShowCreateIconPicker(false);
+                })
+              }
+              className="xs:col-span-2 lg:col-span-1 flex items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-ink disabled:opacity-30 min-h-[44px]"
+            >
+              {busy === "category-new" ? <LoaderCircle size={15} className="animate-spin" /> : <Plus size={15} />}
+              Adicionar
+            </button>
+          </div>
+
+          {/* Grade seletora de ícones para criação */}
+          {showCreateIconPicker && (
+            <div className="rounded-2xl border border-line bg-panel p-3 shadow-xl">
+              <p className="eyebrow mb-2">Selecione o ícone da categoria</p>
+              <div className="grid max-h-[140px] grid-cols-6 sm:grid-cols-8 md:grid-cols-12 gap-2 overflow-y-auto p-1">
+                {AVAILABLE_ICONS.map((iconName) => {
+                  const isSelected = category.icon === iconName;
+                  return (
+                    <button
+                      key={iconName}
+                      type="button"
+                      onClick={() => {
+                        setCategory((cur) => ({ ...cur, icon: iconName }));
+                        setShowCreateIconPicker(false);
+                      }}
+                      className={`flex flex-col items-center justify-center p-2 rounded-xl transition-all ${
+                        isSelected
+                          ? "bg-accent/20 text-accent border border-accent/40 shadow-sm"
+                          : "text-mute hover:bg-cream/6 hover:text-cream"
+                      }`}
+                      title={iconName}
+                    >
+                      <BareIcon icon={iconName} size={18} />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
+
+        {/* Lista de Categorias com botões de Editar e Excluir */}
         <div className="mt-5 grid gap-2 grid-cols-1 xs:grid-cols-2 xl:grid-cols-3">
           {data.categories.map((item) => (
-            <div key={item.id} className="flex items-center gap-3 rounded-2xl border border-line p-3">
+            <div key={item.id} className="group flex items-center gap-3 rounded-2xl border border-line p-3 hover:border-line-strong transition-colors">
               <CategoryIcon icon={item.icon} color={item.color} />
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">{item.name}</p>
+                <p className="truncate text-sm font-medium text-cream">{item.name}</p>
                 <p className="text-[11px] text-faint">{item.type === "income" ? "Receita" : "Despesa"}</p>
               </div>
-              <button
-                aria-label={`Excluir ${item.name}`}
-                disabled={busy !== null}
-                onClick={() => void run(`category-${item.id}`, () => onDeleteCategory(item.id))}
-                className="grid h-9 w-9 place-items-center rounded-lg text-faint hover:bg-coral/10 hover:text-coral transition-colors"
-              >
-                {busy === `category-${item.id}` ? <LoaderCircle size={14} className="animate-spin" /> : <Trash2 size={14} />}
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  aria-label={`Editar ${item.name}`}
+                  onClick={() => {
+                    setEditingCategory(item);
+                    setEditCategoryForm({
+                      name: item.name,
+                      icon: item.icon,
+                      color: item.color,
+                      type: item.type,
+                    });
+                  }}
+                  className="grid h-9 w-9 place-items-center rounded-lg text-faint hover:bg-cream/10 hover:text-cream transition-colors"
+                  title="Editar Categoria"
+                >
+                  <Pencil size={14} />
+                </button>
+                <button
+                  aria-label={`Excluir ${item.name}`}
+                  disabled={busy !== null}
+                  onClick={() => void run(`category-${item.id}`, () => onDeleteCategory(item.id))}
+                  className="grid h-9 w-9 place-items-center rounded-lg text-faint hover:bg-coral/10 hover:text-coral transition-colors"
+                  title="Excluir Categoria"
+                >
+                  {busy === `category-${item.id}` ? <LoaderCircle size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                </button>
+              </div>
             </div>
           ))}
         </div>
@@ -642,6 +748,193 @@ export function ManageView({
           </div>
         </section>
       </div>
+
+      {/* Modal de Edição de Categoria */}
+      <AnimatePresence>
+        {editingCategory && (
+          <motion.div
+            className="fixed inset-0 z-[95] flex items-end justify-center p-0 sm:items-center sm:p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.button
+              aria-label="Fechar"
+              className="absolute inset-0 bg-ink/75 backdrop-blur-md"
+              onClick={() => setEditingCategory(null)}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            />
+            <motion.div
+              role="dialog"
+              aria-modal
+              className="relative max-h-[92dvh] sm:max-h-[90dvh] w-full max-w-[480px] overflow-y-auto rounded-t-[26px] sm:rounded-[26px] border border-line-strong bg-panel p-5 sm:p-7 shadow-[0_40px_120px_-20px_rgba(0,0,0,0.9)] overscroll-contain pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:pb-7"
+              initial={{ opacity: 0, y: 32, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 20, scale: 0.98 }}
+              transition={{ type: "spring", stiffness: 380, damping: 32 }}
+            >
+              {/* Header com Preview */}
+              <div className="flex items-center justify-between gap-3 border-b border-line pb-4 mb-5">
+                <div className="flex items-center gap-3">
+                  <CategoryIcon icon={editCategoryForm.icon} color={editCategoryForm.color} chip={46} size={22} />
+                  <div className="min-w-0">
+                    <p className="eyebrow mb-0.5">editar categoria</p>
+                    <h2 className="font-serif text-[22px] leading-tight text-cream truncate">
+                      {editCategoryForm.name || "Sem nome"}
+                    </h2>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setEditingCategory(null)}
+                  className="grid h-9 w-9 place-items-center rounded-xl border border-line text-mute transition-colors hover:border-line-strong hover:text-cream"
+                  aria-label="Fechar"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {/* Nome */}
+                <div>
+                  <label className="eyebrow mb-1.5 block">Nome da categoria</label>
+                  <input
+                    className="field"
+                    placeholder="Ex.: Alimentação, Saúde, etc."
+                    value={editCategoryForm.name}
+                    onChange={(e) => setEditCategoryForm((cur) => ({ ...cur, name: e.target.value }))}
+                  />
+                </div>
+
+                {/* Tipo */}
+                <div>
+                  <label className="eyebrow mb-1.5 block">Tipo de movimentação</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditCategoryForm((cur) => ({ ...cur, type: "expense" }))}
+                      className={`flex items-center justify-center gap-2 rounded-xl border py-2.5 text-xs font-semibold transition-colors min-h-[44px] ${
+                        editCategoryForm.type === "expense"
+                          ? "border-coral/60 bg-coral/15 text-coral shadow-sm"
+                          : "border-line bg-cream/[0.02] text-mute hover:border-line-strong hover:text-cream"
+                      }`}
+                    >
+                      Despesa
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditCategoryForm((cur) => ({ ...cur, type: "income" }))}
+                      className={`flex items-center justify-center gap-2 rounded-xl border py-2.5 text-xs font-semibold transition-colors min-h-[44px] ${
+                        editCategoryForm.type === "income"
+                          ? "border-accent/60 bg-accent/15 text-accent shadow-sm"
+                          : "border-line bg-cream/[0.02] text-mute hover:border-line-strong hover:text-cream"
+                      }`}
+                    >
+                      Receita
+                    </button>
+                  </div>
+                </div>
+
+                {/* Cor */}
+                <div>
+                  <label className="eyebrow mb-1.5 block">Cor da categoria</label>
+                  <div className="flex flex-wrap items-center gap-2 p-2 rounded-xl border border-line bg-cream/[0.02]">
+                    {PRESET_COLORS.map((c) => {
+                      const isSelected = editCategoryForm.color.toLowerCase() === c.toLowerCase();
+                      return (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => setEditCategoryForm((cur) => ({ ...cur, color: c }))}
+                          className={`grid h-7 w-7 place-items-center rounded-full transition-transform hover:scale-110 ${
+                            isSelected
+                              ? "ring-2 ring-cream ring-offset-2 ring-offset-panel scale-110"
+                              : ""
+                          }`}
+                          style={{ background: c }}
+                        >
+                          {isSelected && <Check size={13} className="text-ink font-bold" strokeWidth={3} />}
+                        </button>
+                      );
+                    })}
+                    <label className="flex items-center gap-1.5 text-[11px] text-faint ml-auto cursor-pointer">
+                      <span>Personalizada</span>
+                      <input
+                        aria-label="Cor customizada"
+                        type="color"
+                        className="h-7 w-7 rounded-full !p-0 border-0 cursor-pointer overflow-hidden bg-transparent"
+                        value={editCategoryForm.color}
+                        onChange={(e) => setEditCategoryForm((cur) => ({ ...cur, color: e.target.value }))}
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                {/* Ícone */}
+                <div>
+                  <label className="eyebrow mb-1.5 block">Ícone da categoria</label>
+                  <div className="grid max-h-[160px] grid-cols-6 gap-2 overflow-y-auto p-2 rounded-2xl border border-line bg-cream/[0.02]">
+                    {AVAILABLE_ICONS.map((iconName) => {
+                      const isSelected = editCategoryForm.icon === iconName;
+                      return (
+                        <button
+                          key={iconName}
+                          type="button"
+                          onClick={() => setEditCategoryForm((cur) => ({ ...cur, icon: iconName }))}
+                          className={`flex flex-col items-center justify-center p-2 rounded-xl transition-all ${
+                            isSelected
+                              ? "bg-accent/20 text-accent border border-accent/40 shadow-sm"
+                              : "text-mute hover:bg-cream/6 hover:text-cream"
+                          }`}
+                          title={iconName}
+                        >
+                          <BareIcon icon={iconName} size={18} />
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Ações */}
+              <div className="mt-6 flex items-center justify-end gap-3 pt-3 border-t border-line">
+                <button
+                  type="button"
+                  onClick={() => setEditingCategory(null)}
+                  className="rounded-xl border border-line px-4 py-2.5 text-xs font-semibold text-mute hover:border-line-strong hover:text-cream transition-colors min-h-[44px]"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  disabled={busy !== null || editCategoryForm.name.trim().length < 2}
+                  onClick={() => {
+                    if (!onUpdateCategory) return;
+                    void run(`category-edit-${editingCategory.id}`, async () => {
+                      await onUpdateCategory(editingCategory.id, {
+                        name: editCategoryForm.name.trim(),
+                        icon: editCategoryForm.icon,
+                        color: editCategoryForm.color,
+                        type: editCategoryForm.type,
+                      });
+                      setEditingCategory(null);
+                    });
+                  }}
+                  className="flex items-center justify-center gap-2 rounded-xl bg-accent px-5 py-2.5 text-xs font-bold text-ink hover:opacity-95 transition-opacity disabled:opacity-30 min-h-[44px]"
+                >
+                  {busy === `category-edit-${editingCategory.id}` ? (
+                    <LoaderCircle size={15} className="animate-spin" />
+                  ) : (
+                    <Check size={15} strokeWidth={2.6} />
+                  )}
+                  Salvar Alterações
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
