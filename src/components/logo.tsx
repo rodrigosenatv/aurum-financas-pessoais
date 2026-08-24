@@ -21,35 +21,35 @@ export function AurumEmblem({ size = 36, className = "" }: { size?: number; clas
     >
       <defs>
         <linearGradient id="aurumEmblemBg" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="#182210" />
-          <stop offset="50%" stop-color="#0b1007" />
-          <stop offset="100%" stop-color="#050704" />
+          <stop offset="0%" stopColor="#182210" />
+          <stop offset="50%" stopColor="#0b1007" />
+          <stop offset="100%" stopColor="#050704" />
         </linearGradient>
         <linearGradient id="aurumEmblemBorder" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="#b6f244" stop-opacity="0.85" />
-          <stop offset="50%" stop-color="#eccb6b" stop-opacity="0.4" />
-          <stop offset="100%" stop-color="#b6f244" stop-opacity="0.2" />
+          <stop offset="0%" stopColor="#b6f244" stopOpacity="0.85" />
+          <stop offset="50%" stopColor="#eccb6b" stopOpacity="0.4" />
+          <stop offset="100%" stopColor="#b6f244" stopOpacity="0.2" />
         </linearGradient>
         <linearGradient id="aurumEmblemGold" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="#dbfb73" />
-          <stop offset="45%" stop-color="#b6f244" />
-          <stop offset="85%" stop-color="#84c519" />
-          <stop offset="100%" stop-color="#e8cd68" />
+          <stop offset="0%" stopColor="#dbfb73" />
+          <stop offset="45%" stopColor="#b6f244" />
+          <stop offset="85%" stopColor="#84c519" />
+          <stop offset="100%" stopColor="#e8cd68" />
         </linearGradient>
         <linearGradient id="aurumEmblemLeaf" x1="0%" y1="100%" x2="100%" y2="0%">
-          <stop offset="0%" stop-color="#7ebc16" />
-          <stop offset="60%" stop-color="#b6f244" />
-          <stop offset="100%" stop-color="#f5e28a" />
+          <stop offset="0%" stopColor="#7ebc16" />
+          <stop offset="60%" stopColor="#b6f244" />
+          <stop offset="100%" stopColor="#f5e28a" />
         </linearGradient>
         <filter id="aurumEmblemShadow" x="-20%" y="-20%" width="140%" height="140%">
-          <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#000" flood-opacity="0.5" />
-          <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#b6f244" flood-opacity="0.35" />
+          <feDropShadow dx="0" dy="10" stdDeviation="14" floodColor="#000" floodOpacity="0.5" />
+          <feDropShadow dx="0" dy="4" stdDeviation="6" floodColor="#b6f244" floodOpacity="0.35" />
         </filter>
       </defs>
 
       {/* Outer Rounded Container */}
       <rect x="24" y="24" width="464" height="464" rx="112" fill="url(#aurumEmblemBg)" />
-      <rect x="24" y="24" width="464" height="464" rx="112" fill="none" stroke="url(#aurumEmblemBorder)" stroke-width="12" />
+      <rect x="24" y="24" width="464" height="464" rx="112" fill="none" stroke="url(#aurumEmblemBorder)" strokeWidth="12" />
 
       {/* Emblem Vectors */}
       <g filter="url(#aurumEmblemShadow)">

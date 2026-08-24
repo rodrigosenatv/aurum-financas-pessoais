@@ -310,16 +310,16 @@ export function Overview({
       {/* ----------------- Banner Importar Fixos do Mês ----------------- */}
       {missingRecurring.length > 0 && onImportRecurring && (
         <Item i={-0.5}>
-          <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-accent/30 bg-accent/[0.07] p-4.5 text-cream backdrop-blur-md shadow-[0_10px_35px_-15px_rgba(182,242,68,0.2)]">
-            <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 sm:gap-4 rounded-2xl border border-accent/30 bg-accent/[0.07] card-pad text-cream backdrop-blur-md shadow-[0_10px_35px_-15px_rgba(182,242,68,0.2)]">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
               <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-accent text-ink">
                 <Repeat2 size={20} strokeWidth={2.4} />
               </span>
-              <div>
+              <div className="min-w-0 flex-1">
                 <p className="font-display text-[14.5px] font-semibold text-cream">
                   Lançamentos Fixos Disponíveis para Este Mês
                 </p>
-                <p className="text-[12px] text-faint">
+                <p className="text-[12px] text-faint break-words">
                   Você possui{" "}
                   <strong className="text-accent font-semibold">
                     {missingExpensesCount > 0 && `${missingExpensesCount} despesa${missingExpensesCount > 1 ? "s" : ""}`}
@@ -334,7 +334,7 @@ export function Overview({
             <button
               disabled={importing}
               onClick={() => void handleImport()}
-              className="flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-xs font-bold text-ink shadow-[0_10px_25px_-5px_rgba(182,242,68,0.4)] hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50"
+              className="flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-xs font-bold text-ink shadow-[0_10px_25px_-5px_rgba(182,242,68,0.4)] hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 min-h-[44px]"
             >
               <Repeat2 size={14} className={importing ? "animate-spin" : ""} strokeWidth={2.4} />
               {importing ? "Importando..." : "Importar Lançamentos Fixos"}
@@ -344,9 +344,9 @@ export function Overview({
       )}
 
       {/* ------------------------------ KPI row ----------------------------- */}
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4 xl:gap-4">
-        <Item i={0} className="col-span-2 xl:col-span-1">
-          <div className="relative h-full overflow-hidden rounded-[22px] bg-[linear-gradient(140deg,#cdf96f,#a9e22c)] p-5 text-ink shadow-[0_20px_70px_-30px_rgba(182,242,68,0.45)]">
+      <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 3xl:grid-cols-4 gap-3 xl:gap-4">
+        <Item i={0} className="col-span-full xs:col-span-2 xl:col-span-1">
+          <div className="relative h-full overflow-hidden rounded-[clamp(16px,4vw,22px)] bg-[linear-gradient(140deg,#cdf96f,#a9e22c)] card-pad text-ink shadow-[0_20px_70px_-30px_rgba(182,242,68,0.45)]">
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ink/65">Saldo em Caixa</p>
@@ -356,7 +356,7 @@ export function Overview({
                 <Wallet size={15} strokeWidth={2.2} />
               </span>
             </div>
-            <p className="mt-3 font-display text-[clamp(1.8rem,2.5vw,2.3rem)] font-semibold leading-none tracking-tight">
+            <p className="mt-3 font-display text-[clamp(1.4rem,6vw,2.3rem)] font-semibold leading-none tracking-tight">
               <Money cents={m.realizedBalance} />
             </p>
             <div className="mt-2.5 flex items-center justify-between text-[11px] font-semibold text-ink/75 bg-ink/10 rounded-lg px-2.5 py-1">
@@ -370,14 +370,14 @@ export function Overview({
         </Item>
 
         <Item i={1}>
-          <div className="card h-full p-5">
+          <div className="card card-pad h-full">
             <div className="flex items-start justify-between">
               <p className="eyebrow">Receitas no mês</p>
               <span className="grid h-8 w-8 place-items-center rounded-lg bg-accent/10 text-accent">
                 <TrendingUp size={15} strokeWidth={2.2} />
               </span>
             </div>
-            <p className="mt-4 font-display text-[clamp(1.5rem,2vw,1.9rem)] font-semibold leading-none tracking-tight text-cream">
+            <p className="mt-4 font-display text-[clamp(1.4rem,4vw,1.9rem)] font-semibold leading-none tracking-tight text-cream">
               <Money cents={m.income} />
             </p>
             <div className="mt-2.5 flex items-center justify-between text-[11px]">
@@ -390,14 +390,14 @@ export function Overview({
         </Item>
 
         <Item i={2}>
-          <div className="card h-full p-5">
+          <div className="card card-pad h-full">
             <div className="flex items-start justify-between">
               <p className="eyebrow">Despesas no mês</p>
               <span className="grid h-8 w-8 place-items-center rounded-lg bg-coral/10 text-coral">
                 <TrendingDown size={15} strokeWidth={2.2} />
               </span>
             </div>
-            <p className="mt-4 font-display text-[clamp(1.5rem,2vw,1.9rem)] font-semibold leading-none tracking-tight text-cream">
+            <p className="mt-4 font-display text-[clamp(1.4rem,4vw,1.9rem)] font-semibold leading-none tracking-tight text-cream">
               <Money cents={m.expense} />
             </p>
             <div className="mt-2.5 flex items-center justify-between text-[11.5px]">
@@ -409,11 +409,11 @@ export function Overview({
           </div>
         </Item>
 
-        <Item i={3} className="col-span-2 xl:col-span-1">
-          <div className="card flex h-full items-center gap-5 p-5">
+        <Item i={3} className="col-span-full xs:col-span-2 xl:col-span-1">
+          <div className="card card-pad flex h-full items-center gap-4 sm:gap-5">
             <div className="relative grid shrink-0 place-items-center">
-              <ProgressRing value={savingsRate / 100} size={84} stroke={8} delay={0.3} />
-              <span className="absolute font-display text-[15px] font-semibold">
+              <ProgressRing value={savingsRate / 100} size={76} stroke={7} delay={0.3} />
+              <span className="absolute font-display text-[14px] font-semibold">
                 <Percent value={savingsRate} />
               </span>
             </div>
@@ -433,14 +433,14 @@ export function Overview({
       {/* ------------------------- checklist gastos fixos ------------------------ */}
       {m.bills.length > 0 && (
         <Item i={3.5}>
-          <div className="card border-accent/20 bg-panel/90 p-5 sm:p-6 shadow-[0_10px_40px_-20px_rgba(182,242,68,0.15)]">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-4">
+          <div className="card border-accent/20 bg-panel/90 card-pad shadow-[0_10px_40px_-20px_rgba(182,242,68,0.15)]">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-line pb-4">
               <div className="flex items-center gap-3">
                 <span className="grid h-9 w-9 place-items-center rounded-xl bg-accent/15 text-accent">
                   <CheckCircle2 size={19} strokeWidth={2.4} />
                 </span>
                 <div>
-                  <h3 className="font-display text-[16px] font-semibold text-cream">
+                  <h3 className="font-display text-[15px] sm:text-[16px] font-semibold text-cream">
                     Controle de Gastos Fixos & Contas do Mês
                   </h3>
                   <p className="text-[12px] text-faint">
@@ -449,8 +449,8 @@ export function Overview({
                 </div>
               </div>
 
-              <div className="flex items-center gap-4">
-                <div className="text-right">
+              <div className="flex items-center justify-between sm:justify-end gap-4">
+                <div className="text-left sm:text-right">
                   <p className="text-[11px] text-faint">Restante a Pagar</p>
                   <p className={`font-display text-[15px] font-bold tabular-nums ${m.pendingExpense > 0 ? "text-amber-400" : "text-accent"}`}>
                     {fmt(m.pendingExpense)}
@@ -458,7 +458,7 @@ export function Overview({
                 </div>
                 <button
                   onClick={onSeeAll}
-                  className="rounded-xl border border-line px-3 py-2 text-xs font-medium text-mute hover:border-accent/40 hover:text-cream"
+                  className="rounded-xl border border-line px-3.5 py-2 text-xs font-medium text-mute hover:border-accent/40 hover:text-cream min-h-[38px]"
                 >
                   Ver todas
                 </button>
@@ -466,7 +466,7 @@ export function Overview({
             </div>
 
             {/* Quick checklist row */}
-            <div className="mt-4 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="mt-4 grid gap-2.5 grid-cols-1 xs:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
               {m.bills.slice(0, 8).map((bill) => (
                 <div
                   key={bill.id}
@@ -510,14 +510,14 @@ export function Overview({
       )}
 
       {/* ------------------------- cash flow + donut ------------------------ */}
-      <div className="grid gap-4 xl:grid-cols-[1.6fr_1fr]">
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-[1.5fr_1fr] xl:grid-cols-[1.6fr_1fr]">
         <Item i={4} id="fluxo" className="scroll-mt-28">
-          <div className="card h-full p-6">
+          <div className="card card-pad h-full">
             <CardHeader
               title="Fluxo de caixa"
               sub="receitas e despesas dos últimos 6 meses"
               right={
-                <div className="flex items-center gap-4 text-[11px] text-mute">
+                <div className="flex items-center gap-3 sm:gap-4 text-[11px] text-mute">
                   <span className="flex items-center gap-1.5">
                     <i className="h-[7px] w-[7px] rounded-full bg-accent" /> Receitas
                   </span>
@@ -532,7 +532,7 @@ export function Overview({
         </Item>
 
         <Item i={5} id="categorias" className="scroll-mt-28">
-          <div className="card flex h-full flex-col p-6">
+          <div className="card card-pad flex h-full flex-col">
             <CardHeader title="Despesas por categoria" sub="distribuição do mês selecionado" />
             <div className="flex flex-1 flex-col items-center gap-6 sm:flex-row xl:flex-col 2xl:flex-row">
               <Donut slices={slices} total={m.expense} active={activeSlice} onActive={setActiveSlice} size={196} />
@@ -549,10 +549,10 @@ export function Overview({
                   >
                     <i className="h-2 w-2 shrink-0 rounded-[3px]" style={{ background: s.color }} />
                     <span className="min-w-0 flex-1 truncate text-[12.5px] text-mute">{s.label}</span>
-                    <span className="text-[11px] tabular-nums text-faint">
+                    <span className="hidden xs:inline text-[11px] tabular-nums text-faint">
                       {m.expense > 0 ? Math.round((s.value / m.expense) * 100) : 0}%
                     </span>
-                    <span className="w-[74px] text-right font-display text-[12px] font-medium tabular-nums text-cream">
+                    <span className="min-w-[64px] shrink-0 text-right font-display text-[12px] font-medium tabular-nums text-cream">
                       {fmt(s.value)}
                     </span>
                   </button>
@@ -564,9 +564,9 @@ export function Overview({
       </div>
 
       {/* --------------------- budgets + goals + recent --------------------- */}
-      <div className="grid gap-4 xl:grid-cols-3">
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
         <Item i={6} id="orcamentos" className="scroll-mt-28">
-          <div className="card h-full p-6">
+          <div className="card card-pad h-full">
             <CardHeader
               title="Orçamentos"
               sub="limites mensais por categoria"
@@ -576,7 +576,7 @@ export function Overview({
                 </span>
               }
             />
-            <div className="max-h-[408px] space-y-4 overflow-y-auto pr-1 [mask-image:linear-gradient(to_bottom,black_88%,transparent)]">
+            <div className="max-h-[min(408px,60dvh)] space-y-4 overflow-y-auto pr-1 [mask-image:linear-gradient(to_bottom,black_88%,transparent)]">
               {data.budgets.map((b) => {
                 const cat = catById.get(b.categoryId);
                 if (!cat) return null;
@@ -602,14 +602,14 @@ export function Overview({
                       <button
                         onClick={() => submitBudget(b)}
                         disabled={busy}
-                        className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-accent text-ink disabled:opacity-50"
+                        className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-accent text-ink disabled:opacity-50"
                         aria-label="Confirmar"
                       >
                         <Check size={14} strokeWidth={2.6} />
                       </button>
                       <button
                         onClick={() => setEditBudgetId(null)}
-                        className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-line text-mute hover:text-cream"
+                        className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-line text-mute hover:text-cream"
                         aria-label="Cancelar"
                       >
                         <X size={14} />
@@ -645,10 +645,10 @@ export function Overview({
                         setEditBudgetId(b.id);
                         setBudgetInput((b.amountCents / 100).toFixed(0));
                       }}
-                      className="grid h-7 w-7 shrink-0 place-items-center self-start rounded-md text-faint opacity-0 transition-all hover:bg-cream/6 hover:text-cream group-hover:opacity-100"
+                      className="hover-reveal [@media(hover:hover)]:opacity-0 grid h-8 w-8 sm:h-7 sm:w-7 shrink-0 place-items-center self-start rounded-md text-faint transition-all hover:bg-cream/6 hover:text-cream group-hover:opacity-100"
                       aria-label={`Editar limite de ${cat.name}`}
                     >
-                      <Pencil size={12.5} />
+                      <Pencil size={13} />
                     </button>
                   </div>
                 );
@@ -658,7 +658,7 @@ export function Overview({
         </Item>
 
         <Item i={7} id="metas" className="scroll-mt-28">
-          <div className="card h-full p-6">
+          <div className="card card-pad h-full">
             <CardHeader title="Metas" sub="por que você está juntando" />
             <div className="space-y-5">
               {data.goals.map((g, gi) => {
@@ -684,14 +684,14 @@ export function Overview({
                       </div>
                       <button
                         onClick={() => setDepositId(open ? null : g.id)}
-                        className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg border transition-all ${
+                        className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg border transition-all ${
                           open
                             ? "border-accent/50 bg-accent/10 text-accent"
                             : "border-line text-mute hover:border-line-strong hover:text-cream"
                         }`}
                         aria-label={`Fazer aporte em ${g.name}`}
                       >
-                        <Plus size={14} strokeWidth={2.4} />
+                        <Plus size={15} strokeWidth={2.4} />
                       </button>
                     </div>
                     <AnimatePresence initial={false}>
@@ -703,33 +703,33 @@ export function Overview({
                           transition={{ duration: 0.28, ease: "easeOut" }}
                           className="overflow-hidden"
                         >
-                          <div className="mt-3 flex flex-wrap items-center gap-1.5 pl-[76px]">
+                          <div className="mt-3 flex flex-wrap items-center gap-1.5 pl-0 sm:pl-[76px]">
                             {[10000, 50000, 100000].map((v) => (
                               <button
                                 key={v}
                                 disabled={busy}
                                 onClick={() => submitDeposit(g, v)}
-                                className="rounded-lg border border-line px-2.5 py-1.5 text-[11px] font-medium text-mute transition-colors hover:border-accent/40 hover:text-accent disabled:opacity-50"
+                                className="flex-1 xs:flex-none min-h-[38px] rounded-lg border border-line px-2.5 py-1.5 text-[11px] font-medium text-mute transition-colors hover:border-accent/40 hover:text-accent disabled:opacity-50"
                               >
                                 +{fmt(v)}
                               </button>
                             ))}
-                            <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                            <div className="flex min-w-0 flex-1 items-center gap-1.5 w-full xs:w-auto">
                               <input
                                 inputMode="decimal"
                                 placeholder="outro valor"
                                 value={depositInput}
                                 onChange={(e) => setDepositInput(e.target.value)}
                                 onKeyDown={(e) => e.key === "Enter" && submitDeposit(g)}
-                                className="field !rounded-lg !px-2.5 !py-1.5 text-[11.5px]"
+                                className="field !rounded-lg !px-2.5 !py-1.5 text-[11.5px] min-h-[38px]"
                               />
                               <button
                                 disabled={busy}
                                 onClick={() => submitDeposit(g)}
-                                className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-lg bg-accent text-ink disabled:opacity-50"
+                                className="grid h-10 w-10 sm:h-[38px] sm:w-[38px] shrink-0 place-items-center rounded-lg bg-accent text-ink disabled:opacity-50"
                                 aria-label="Confirmar aporte"
                               >
-                                <Check size={13} strokeWidth={2.6} />
+                                <Check size={14} strokeWidth={2.6} />
                               </button>
                             </div>
                           </div>
@@ -743,14 +743,14 @@ export function Overview({
           </div>
         </Item>
 
-        <Item i={8} id="recentes">
-          <div className="card flex h-full flex-col p-6">
+        <Item i={8} id="recentes" className="md:col-span-2 xl:col-span-1">
+          <div className="card card-pad flex h-full flex-col">
             <CardHeader
               title="Transações recentes"
               right={
                 <button
                   onClick={onSeeAll}
-                  className="flex items-center gap-1 text-[12px] font-medium text-mute transition-colors hover:text-accent"
+                  className="flex items-center gap-1 text-[12px] font-medium text-mute transition-colors hover:text-accent min-h-[32px]"
                 >
                   ver todas <ArrowRight size={13} />
                 </button>
@@ -771,14 +771,14 @@ export function Overview({
                   {/* Status indicator button */}
                   <span
                     onClick={(e) => handleToggle(e, t)}
-                    className={`grid h-5 w-5 shrink-0 place-items-center rounded-md transition-all ${
+                    className={`grid h-6 w-6 shrink-0 place-items-center rounded-md transition-all ${
                       t.isPaid
                         ? "bg-accent/15 text-accent hover:bg-accent hover:text-ink"
                         : "border border-amber-400 bg-amber-400/10 text-amber-400 hover:bg-amber-400 hover:text-ink"
                     }`}
                     title={t.isPaid ? "Pago" : "Pendente"}
                   >
-                    {t.isPaid ? <Check size={11} strokeWidth={3} /> : <Clock size={11} />}
+                    {t.isPaid ? <Check size={12} strokeWidth={3} /> : <Clock size={12} />}
                   </span>
 
                   <CategoryIcon icon={t.category.icon} color={t.category.color} chip={36} />

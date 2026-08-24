@@ -1,6 +1,9 @@
 @import "tailwindcss";
 
 @theme {
+  --breakpoint-xs: 480px;
+  --breakpoint-3xl: 1800px;
+
   --color-ink: #060807;
   --color-panel: #0b0d0a;
   --color-raise: #14170f;
@@ -16,6 +19,13 @@
   --font-display: var(--font-grotesk), "Space Grotesk", ui-sans-serif, system-ui;
   --font-serif: var(--font-iserif), "Instrument Serif", Georgia, serif;
   --font-sans: var(--font-inter), ui-sans-serif, system-ui;
+}
+
+:root {
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
 }
 
 html {
@@ -91,11 +101,20 @@ input[type="date"] {
   .card {
     position: relative;
     border: 1px solid var(--color-line);
-    border-radius: 22px;
+    border-radius: clamp(16px, 4vw, 22px);
     background:
       linear-gradient(160deg, rgb(238 242 228 / 0.032), rgb(238 242 228 / 0.006) 42%),
       var(--color-panel);
     box-shadow: 0 24px 60px -40px rgb(0 0 0 / 0.8);
+  }
+
+  .card-pad {
+    padding: clamp(1rem, 3.2vw, 1.5rem);
+  }
+
+  .tap {
+    min-height: 44px;
+    min-width: 44px;
   }
 
   .eyebrow {
@@ -108,14 +127,20 @@ input[type="date"] {
 
   .field {
     width: 100%;
+    min-height: 44px;
     border-radius: 14px;
     border: 1px solid var(--color-line);
     background: rgb(6 8 7 / 0.6);
-    padding: 0.7rem 0.9rem;
-    font-size: 0.875rem;
+    padding: 0.65rem 0.9rem;
+    font-size: 16px;
     color: var(--color-cream);
     outline: none;
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+  @media (min-width: 640px) {
+    .field {
+      font-size: 0.875rem;
+    }
   }
   .field::placeholder {
     color: var(--color-faint);
@@ -123,5 +148,32 @@ input[type="date"] {
   .field:focus {
     border-color: rgb(182 242 68 / 0.5);
     box-shadow: 0 0 0 3px rgb(182 242 68 / 0.1);
+  }
+}
+
+@layer utilities {
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@media (hover: none), (pointer: coarse) {
+  .hover-reveal {
+    opacity: 1 !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

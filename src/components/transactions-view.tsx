@@ -188,27 +188,25 @@ export function TransactionsView({
       )}
 
       {/* summary strip */}
-      <div className="card flex flex-wrap items-center gap-x-8 gap-y-3 px-6 py-4">
-        <div>
+      <div className="card grid grid-cols-2 xs:grid-cols-3 lg:grid-cols-5 gap-3 p-4 sm:p-5 lg:gap-0 lg:divide-x lg:divide-line">
+        <div className="px-1 sm:px-2 lg:px-4">
           <p className="eyebrow mb-1">Transações</p>
-          <p className="font-display text-[17px] font-semibold tabular-nums text-cream">{filtered.length}</p>
+          <p className="font-display text-[16px] sm:text-[17px] font-semibold tabular-nums text-cream">{filtered.length}</p>
         </div>
-        <div className="h-8 w-px bg-line" />
-        <div>
+        <div className="px-1 sm:px-2 lg:px-4">
           <p className="eyebrow mb-1">Entradas Total</p>
-          <p className="font-display text-[17px] font-semibold tabular-nums text-accent">{fmt(income)}</p>
+          <p className="font-display text-[16px] sm:text-[17px] font-semibold tabular-nums text-accent">{fmt(income)}</p>
           <p className="text-[10px] text-faint mt-0.5">{fmt(paidIncome)} recebidas</p>
         </div>
-        <div>
+        <div className="px-1 sm:px-2 lg:px-4">
           <p className="eyebrow mb-1">Despesas Total</p>
-          <p className="font-display text-[17px] font-semibold tabular-nums text-coral">{fmt(expense)}</p>
+          <p className="font-display text-[16px] sm:text-[17px] font-semibold tabular-nums text-coral">{fmt(expense)}</p>
           <p className="text-[10px] text-faint mt-0.5">{fmt(paidExpense)} pagas</p>
         </div>
-        <div className="h-8 w-px bg-line" />
-        <div>
+        <div className="px-1 sm:px-2 lg:px-4">
           <p className="eyebrow mb-1">Pendentes a Pagar</p>
           <p
-            className={`font-display text-[17px] font-semibold tabular-nums ${
+            className={`font-display text-[16px] sm:text-[17px] font-semibold tabular-nums ${
               pendingExpense > 0 ? "text-amber-400" : "text-faint"
             }`}
           >
@@ -216,11 +214,10 @@ export function TransactionsView({
           </p>
           <p className="text-[10px] text-faint mt-0.5">{pendingCount} contas</p>
         </div>
-        <div className="h-8 w-px bg-line" />
-        <div>
+        <div className="col-span-2 xs:col-span-1 px-1 sm:px-2 lg:px-4">
           <p className="eyebrow mb-1">Saldo do filtro</p>
           <p
-            className="font-display text-[17px] font-semibold tabular-nums"
+            className="font-display text-[16px] sm:text-[17px] font-semibold tabular-nums"
             style={{ color: income - expense >= 0 ? "#b6f244" : "#ff6e82" }}
           >
             {fmt(income - expense)}
@@ -232,9 +229,9 @@ export function TransactionsView({
       </div>
 
       {/* filters & tabs */}
-      <div className="card space-y-3 px-5 py-4">
+      <div className="card space-y-3 px-3 xs:px-4 sm:px-5 py-4">
         {/* Quick status tabs */}
-        <div className="flex flex-wrap items-center gap-1.5 border-b border-line pb-3">
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar snap-x border-b border-line pb-3">
           {(
             [
               { id: "all", label: "Todas" },
@@ -249,7 +246,7 @@ export function TransactionsView({
                 setStatusFilter(tab.id);
                 setPagination({ key, page: 1 });
               }}
-              className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
+              className={`flex shrink-0 snap-start items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold min-h-[44px] transition-all ${
                 statusFilter === tab.id
                   ? "bg-accent text-ink shadow-[0_2px_12px_rgba(182,242,68,0.3)]"
                   : "bg-panel text-mute hover:bg-cream/6 hover:text-cream"
@@ -270,7 +267,7 @@ export function TransactionsView({
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
-          <div className="relative min-w-[200px] flex-1">
+          <div className="relative basis-[min(100%,260px)] flex-1">
             <Search size={14} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-faint" />
             <input
               value={query}
@@ -279,18 +276,18 @@ export function TransactionsView({
                 setPagination({ key, page: 1 });
               }}
               placeholder="Buscar por descrição ou categoria..."
-              className="field !pl-9"
+              className="field !pl-9 w-full"
             />
           </div>
 
-          <div className="relative">
+          <div className="relative basis-[min(100%,160px)] flex-1 xs:flex-none">
             <select
               value={typeFilter}
               onChange={(e) => {
                 setTypeFilter(e.target.value as "all" | TxnType);
                 setPagination({ key, page: 1 });
               }}
-              className="field appearance-none !pr-9"
+              className="field appearance-none !pr-9 w-full"
             >
               <option value="all">Tipos (Todos)</option>
               <option value="income">Receitas</option>
@@ -299,14 +296,14 @@ export function TransactionsView({
             <ChevronDown size={13} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-faint" />
           </div>
 
-          <div className="relative">
+          <div className="relative basis-[min(100%,190px)] flex-1 xs:flex-none">
             <select
               value={catFilter}
               onChange={(e) => {
                 setCatFilter(e.target.value);
                 setPagination({ key, page: 1 });
               }}
-              className="field appearance-none !pr-9"
+              className="field appearance-none !pr-9 w-full"
             >
               <option value="all">Todas as categorias</option>
               {data.categories.map((c) => (
@@ -327,7 +324,7 @@ export function TransactionsView({
                 setCatFilter("all");
                 setPagination({ key, page: 1 });
               }}
-              className="flex items-center gap-1.5 rounded-xl border border-line px-3.5 py-[11px] text-[12px] font-medium text-mute transition-colors hover:border-line-strong hover:text-cream"
+              className="flex w-full xs:w-auto items-center justify-center gap-1.5 rounded-xl border border-line px-3.5 py-2.5 text-[12px] font-medium text-mute transition-colors hover:border-line-strong hover:text-cream min-h-[44px]"
             >
               <X size={13} /> Limpar
             </button>
@@ -341,12 +338,12 @@ export function TransactionsView({
 
       {/* list */}
       {groups.length === 0 ? (
-        <div className="card grid place-items-center px-6 py-20 text-center">
+        <div className="card grid place-items-center px-4 sm:px-6 py-20 text-center">
           <span className="grid h-12 w-12 place-items-center rounded-2xl border border-line text-faint">
             <SearchX size={20} />
           </span>
           <p className="mt-4 font-display text-[15px] font-semibold text-cream">Nada por aqui</p>
-          <p className="mt-1 max-w-[260px] text-[12.5px] text-faint">
+          <p className="mt-1 max-w-[28ch] text-[12.5px] text-faint">
             Nenhuma transação encontrada com esses filtros neste mês.
           </p>
         </div>
@@ -359,7 +356,7 @@ export function TransactionsView({
             );
             return (
               <div key={date}>
-                <div className="flex items-baseline justify-between border-b border-line bg-cream/[0.025] px-6 py-2.5">
+                <div className="flex items-baseline justify-between border-b border-line bg-cream/[0.025] px-3 xs:px-4 sm:px-6 py-2.5">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-mute">
                     {fullDayLabel(date)}
                   </p>
@@ -377,39 +374,41 @@ export function TransactionsView({
                       layout
                       exit={{ opacity: 0, x: -24, height: 0 }}
                       transition={{ duration: 0.25 }}
-                      className={`group flex cursor-pointer items-center gap-3.5 border-b border-line/60 px-6 py-3 transition-colors last:border-0 hover:bg-cream/[0.03] ${
+                      className={`group flex flex-wrap sm:flex-nowrap cursor-pointer items-center gap-3 sm:gap-3.5 border-b border-line/60 px-3 xs:px-4 sm:px-6 py-3 transition-colors last:border-0 hover:bg-cream/[0.03] ${
                         !t.isPaid && t.type === "expense" ? "bg-amber-500/[0.03]" : ""
                       }`}
                       onClick={() => onEdit(t)}
                     >
-                      {/* Checkbox toggle Pago / Pendente */}
-                      <button
-                        type="button"
-                        onClick={(e) => handleToggle(e, t)}
-                        disabled={toggling === t.id}
-                        title={t.isPaid ? "Marcado como pago. Clique para marcar pendente." : "Pendente. Clique para marcar como pago."}
-                        className={`grid h-6 w-6 shrink-0 place-items-center rounded-lg transition-all ${
-                          t.isPaid
-                            ? "bg-accent/15 text-accent border border-accent/30 hover:bg-accent hover:text-ink"
-                            : "border-2 border-amber-400 bg-amber-400/10 text-amber-400 hover:bg-amber-400 hover:text-ink animate-pulse"
-                        }`}
-                      >
-                        {t.isPaid ? (
-                          <Check size={13} strokeWidth={2.8} />
-                        ) : (
-                          <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
-                        )}
-                      </button>
+                      {/* Checkbox toggle Pago / Pendente with 44px tap target */}
+                      <div className="grid h-11 w-11 shrink-0 place-items-center -m-2">
+                        <button
+                          type="button"
+                          onClick={(e) => handleToggle(e, t)}
+                          disabled={toggling === t.id}
+                          title={t.isPaid ? "Marcado como pago. Clique para marcar pendente." : "Pendente. Clique para marcar como pago."}
+                          className={`grid h-6 w-6 place-items-center rounded-lg transition-all ${
+                            t.isPaid
+                              ? "bg-accent/15 text-accent border border-accent/30 hover:bg-accent hover:text-ink"
+                              : "border-2 border-amber-400 bg-amber-400/10 text-amber-400 hover:bg-amber-400 hover:text-ink animate-pulse"
+                          }`}
+                        >
+                          {t.isPaid ? (
+                            <Check size={13} strokeWidth={2.8} />
+                          ) : (
+                            <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+                          )}
+                        </button>
+                      </div>
 
                       <CategoryIcon icon={t.category.icon} color={t.category.color} chip={37} />
 
-                      <div className="min-w-0 flex-1">
+                      <div className="min-w-0 flex-1 basis-[calc(100%-140px)] sm:basis-auto">
                         <div className="flex items-center gap-2">
                           <p className={`truncate text-[13.5px] font-medium ${t.isPaid ? "text-cream" : "text-amber-200"}`}>
                             {t.description}
                           </p>
                           {!t.isPaid && t.type === "expense" && (
-                            <span className="inline-flex items-center gap-1 rounded-md bg-amber-400/15 px-1.5 py-0.5 text-[9.5px] font-semibold text-amber-400">
+                            <span className="inline-flex items-center gap-1 rounded-md bg-amber-400/15 px-1.5 py-0.5 text-[9.5px] font-semibold text-amber-400 shrink-0">
                               <Clock size={10} /> pendente
                             </span>
                           )}
@@ -430,7 +429,7 @@ export function TransactionsView({
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                      <div className="hover-reveal [@media(hover:hover)]:opacity-0 flex items-center gap-1 sm:opacity-0 transition-opacity group-hover:opacity-100 order-3 sm:order-none ml-auto sm:ml-0">
                         <span
                           role="button"
                           aria-label="Editar"
@@ -438,7 +437,7 @@ export function TransactionsView({
                             e.stopPropagation();
                             onEdit(t);
                           }}
-                          className="grid h-7 w-7 place-items-center rounded-lg text-faint transition-colors hover:bg-cream/8 hover:text-cream"
+                          className="grid h-9 w-9 sm:h-7 sm:w-7 place-items-center rounded-lg text-faint transition-colors hover:bg-cream/8 hover:text-cream"
                         >
                           <Pencil size={13} />
                         </span>
@@ -449,7 +448,7 @@ export function TransactionsView({
                             e.stopPropagation();
                             void remove(t.id);
                           }}
-                          className={`grid h-7 w-7 place-items-center rounded-lg text-faint transition-colors hover:bg-coral/15 hover:text-coral ${
+                          className={`grid h-9 w-9 sm:h-7 sm:w-7 place-items-center rounded-lg text-faint transition-colors hover:bg-coral/15 hover:text-coral ${
                             deleting === t.id ? "animate-pulse !opacity-100 text-coral" : ""
                           }`}
                         >
@@ -457,7 +456,7 @@ export function TransactionsView({
                         </span>
                       </div>
 
-                      <div className="text-right">
+                      <div className="text-right shrink-0">
                         <p
                           className={`font-display text-[13.5px] font-medium tabular-nums ${
                             t.type === "income" ? "text-accent" : t.isPaid ? "text-cream" : "text-amber-300"
@@ -478,11 +477,11 @@ export function TransactionsView({
         </div>
       )}
       {filtered.length > pageSize && (
-        <div className="flex items-center justify-center gap-3 pt-2">
+        <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
           <button
             disabled={page === 1}
             onClick={() => setPagination({ key, page: Math.max(1, page - 1) })}
-            className="rounded-xl border border-line px-4 py-2 text-xs text-mute hover:text-cream disabled:opacity-30"
+            className="min-h-[44px] rounded-xl border border-line px-4 py-2 text-xs text-mute hover:text-cream disabled:opacity-30"
           >
             Anterior
           </button>
@@ -490,7 +489,7 @@ export function TransactionsView({
           <button
             disabled={page === totalPages}
             onClick={() => setPagination({ key, page: Math.min(totalPages, page + 1) })}
-            className="rounded-xl border border-line px-4 py-2 text-xs text-mute hover:text-cream disabled:opacity-30"
+            className="min-h-[44px] rounded-xl border border-line px-4 py-2 text-xs text-mute hover:text-cream disabled:opacity-30"
           >
             Próxima
           </button>

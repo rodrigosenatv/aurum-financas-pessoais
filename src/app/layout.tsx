@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Instrument_Serif, Inter, Space_Grotesk } from "next/font/google";
 import type { ReactNode } from "react";
 import "./globals.css";
@@ -23,6 +23,13 @@ const inter = Inter({
   display: "swap",
 });
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#060807",
+};
+
 export const metadata: Metadata = {
   title: "aurum · finanças pessoais",
   description:
@@ -43,7 +50,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       lang="pt-BR"
       className={`${grotesk.variable} ${iserif.variable} ${inter.variable}`}
     >
-      <body className="min-h-dvh bg-ink font-sans text-cream antialiased">
+      <body className="min-h-dvh bg-ink font-sans text-cream antialiased overscroll-y-none">
         {children}
       </body>
     </html>

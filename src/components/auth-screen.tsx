@@ -33,16 +33,16 @@ export function AuthScreen({ databaseError }: { databaseError?: string }) {
   };
 
   return (
-    <main className="relative z-10 grid min-h-dvh place-items-center px-4 py-12">
-      <section className="card w-full max-w-[430px] p-7 sm:p-9">
-        <div className="mb-8">
+    <main className="relative z-10 grid min-h-dvh place-items-center px-4 py-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+      <section className="card w-full max-w-[430px] p-5 xs:p-7 sm:p-9">
+        <div className="mb-6 sm:mb-8">
           <AurumLogo size={42} />
         </div>
         <p className="eyebrow mb-2">{register ? "comece agora" : "bem-vindo de volta"}</p>
-        <h2 className="font-serif text-3xl text-cream">
+        <h2 className="font-serif text-[clamp(1.5rem,6vw,1.875rem)] leading-tight text-cream">
           {register ? "Crie seu espaço financeiro." : "Seu dinheiro, no controle."}
         </h2>
-        <div className="mt-7 space-y-4">
+        <div className="mt-6 sm:mt-7 space-y-4">
           {register && (
             <label className="block">
               <span className="eyebrow mb-2 block">Nome</span>
@@ -69,7 +69,7 @@ export function AuthScreen({ databaseError }: { databaseError?: string }) {
         <button
           onClick={() => void submit()}
           disabled={busy || Boolean(databaseError)}
-          className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-accent py-3.5 text-sm font-bold text-ink disabled:opacity-40"
+          className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-accent py-3.5 text-sm font-bold text-ink disabled:opacity-40 min-h-[46px]"
         >
           {busy && <LoaderCircle size={16} className="animate-spin" />}
           {register ? "Criar conta" : "Entrar"}
@@ -80,7 +80,7 @@ export function AuthScreen({ databaseError }: { databaseError?: string }) {
               setRegister((value) => !value);
               setError(null);
             }}
-            className="mt-4 w-full text-center text-xs text-mute hover:text-accent"
+            className="mt-4 w-full text-center text-xs text-mute hover:text-accent min-h-[40px] flex items-center justify-center"
           >
             {register ? "Já tenho uma conta" : "Criar uma nova conta"}
           </button>

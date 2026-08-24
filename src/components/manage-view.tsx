@@ -109,7 +109,31 @@ export function ManageView({
   };
 
   useEffect(() => {
-    void loadTelegramStatus();
+    let active = true;
+    fetch("/api/telegram/connect")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
+        if (!active || !json) return;
+        setTgInfo((cur) => ({
+          ...cur,
+          loading: false,
+          connected: json.connected,
+          chatId: json.chatId,
+          username: json.username,
+          pairCode: json.pairCode,
+          pairExpires: json.pairExpires,
+          notifyDueBills: json.notifyDueBills ?? true,
+          notifyBudgetLimit: json.notifyBudgetLimit ?? true,
+          botUsername: json.botUsername,
+          botConfigured: json.botConfigured,
+        }));
+      })
+      .catch(() => {
+        if (active) setTgInfo((cur) => ({ ...cur, loading: false }));
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
   const generateTgCode = async () => {
@@ -212,11 +236,11 @@ export function ManageView({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const budgeted = useMemo(() => new Set(data.budgets.map((budget) => budget.categoryId)), [data.budgets]);
+  const budgeted = useMemo(() => new Set(data.budgets.map((budget) => budget.categoryId)), [data]);
   const availableBudgetCategories = data.categories.filter(
     (item) => item.type === "expense" && !budgeted.has(item.id),
   );
-  const categoryById = useMemo(() => new Map(data.categories.map((item) => [item.id, item])), [data.categories]);
+  const categoryById = useMemo(() => new Map(data.categories.map((item) => [item.id, item])), [data]);
 
   // Unique list of active recurring expenses
   const recurringItems = useMemo(() => {
@@ -230,7 +254,7 @@ export function ManageView({
       }
     }
     return [...map.values()].sort((a, b) => b.amountCents - a.amountCents);
-  }, [data.transactions]);
+  }, [data]);
 
   const totalFixedExpenses = useMemo(
     () => recurringItems.filter((t) => t.type === "expense").reduce((s, t) => s + t.amountCents, 0),
@@ -255,7 +279,7 @@ export function ManageView({
       {message && <p className="card border-accent/30 bg-accent/5 px-5 py-3 text-xs text-accent">{message}</p>}
 
       {/* Seção do Agente Telegram */}
-      <section className="card relative overflow-hidden border-accent/25 p-6">
+      <section className="card relative overflow-hidden border-accent/25 card-pad">
         <div className="absolute right-0 top-0 h-40 w-40 translate-x-12 -translate-y-12 rounded-full bg-accent/10 blur-3xl pointer-events-none" />
 
         <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
@@ -284,7 +308,7 @@ export function ManageView({
 
           <button
             onClick={() => void loadTelegramStatus()}
-            className="grid h-8 w-8 place-items-center rounded-lg border border-line text-faint hover:text-cream transition-colors"
+            className="grid h-9 w-9 place-items-center rounded-lg border border-line text-faint hover:text-cream transition-colors"
             title="Atualizar status"
           >
             <RefreshCw size={14} className={tgInfo.loading ? "animate-spin" : ""} />
@@ -300,11 +324,11 @@ export function ManageView({
                   {tgInfo.username ? `@${tgInfo.username}` : `Chat ID: ${tgInfo.chatId}`}
                 </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 w-full xs:w-auto">
                 <button
                   disabled={busy === "tg-test"}
                   onClick={() => void sendTestMessage()}
-                  className="flex items-center gap-1.5 rounded-xl border border-accent/30 bg-accent/10 px-3 py-1.5 text-xs font-semibold text-accent hover:bg-accent/20 transition-colors disabled:opacity-50"
+                  className="flex-1 xs:flex-none flex items-center justify-center gap-1.5 rounded-xl border border-accent/30 bg-accent/10 px-3 py-2 text-xs font-semibold text-accent hover:bg-accent/20 transition-colors disabled:opacity-50 min-h-[40px]"
                 >
                   {busy === "tg-test" ? <LoaderCircle size={13} className="animate-spin" /> : <Send size={13} />}
                   Enviar Teste
@@ -312,7 +336,7 @@ export function ManageView({
                 <button
                   disabled={busy === "tg-disconnect"}
                   onClick={() => void disconnectTelegram()}
-                  className="rounded-xl border border-coral/20 px-3 py-1.5 text-xs font-semibold text-coral hover:bg-coral/10 transition-colors disabled:opacity-50"
+                  className="flex-1 xs:flex-none rounded-xl border border-coral/20 px-3 py-2 text-xs font-semibold text-coral hover:bg-coral/10 transition-colors disabled:opacity-50 min-h-[40px]"
                 >
                   Desconectar
                 </button>
@@ -320,8 +344,8 @@ export function ManageView({
             </div>
 
             {/* Preferências de Notificação */}
-            <div className="grid gap-3 sm:grid-cols-2 pt-1">
-              <label className="flex items-center justify-between rounded-xl border border-line bg-cream/[0.02] p-3.5 cursor-pointer hover:border-line/80 transition-colors">
+            <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 pt-1">
+              <label className="flex items-center justify-between rounded-xl border border-line bg-cream/[0.02] p-3.5 cursor-pointer hover:border-line/80 transition-colors min-h-[52px]">
                 <div className="flex items-center gap-2.5">
                   <Bell size={16} className="text-accent" />
                   <div>
@@ -333,11 +357,11 @@ export function ManageView({
                   type="checkbox"
                   checked={tgInfo.notifyDueBills}
                   onChange={(e) => void updateTgSettings("due", e.target.checked)}
-                  className="h-4 w-4 rounded accent-accent cursor-pointer"
+                  className="h-5 w-5 rounded accent-accent cursor-pointer"
                 />
               </label>
 
-              <label className="flex items-center justify-between rounded-xl border border-line bg-cream/[0.02] p-3.5 cursor-pointer hover:border-line/80 transition-colors">
+              <label className="flex items-center justify-between rounded-xl border border-line bg-cream/[0.02] p-3.5 cursor-pointer hover:border-line/80 transition-colors min-h-[52px]">
                 <div className="flex items-center gap-2.5">
                   <Zap size={16} className="text-coral" />
                   <div>
@@ -349,14 +373,14 @@ export function ManageView({
                   type="checkbox"
                   checked={tgInfo.notifyBudgetLimit}
                   onChange={(e) => void updateTgSettings("budget", e.target.checked)}
-                  className="h-4 w-4 rounded accent-accent cursor-pointer"
+                  className="h-5 w-5 rounded accent-accent cursor-pointer"
                 />
               </label>
             </div>
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="rounded-2xl border border-line bg-cream/[0.02] p-5">
+            <div className="rounded-2xl border border-line bg-cream/[0.02] p-4 sm:p-5">
               {tgInfo.pairCode ? (
                 <div className="space-y-3">
                   <p className="text-xs text-faint">
@@ -364,14 +388,14 @@ export function ManageView({
                   </p>
 
                   <div className="flex flex-wrap items-center gap-2">
-                    <div className="flex items-center gap-2 rounded-xl bg-ink/70 border border-line px-3.5 py-2 font-mono text-base font-bold text-accent">
+                    <div className="flex w-full xs:w-auto items-center justify-between gap-2 rounded-xl bg-ink/70 border border-line px-3.5 py-2 font-mono text-sm sm:text-base font-bold text-accent break-all">
                       <span>/conectar {tgInfo.pairCode}</span>
                       <button
                         onClick={() => copyCode(`/conectar ${tgInfo.pairCode}`)}
-                        className="text-faint hover:text-cream ml-1"
+                        className="text-faint hover:text-cream ml-1 p-1"
                         title="Copiar comando"
                       >
-                        {copied ? <CheckCircle2 size={15} className="text-accent" /> : <Copy size={15} />}
+                        {copied ? <CheckCircle2 size={16} className="text-accent" /> : <Copy size={16} />}
                       </button>
                     </div>
 
@@ -380,7 +404,7 @@ export function ManageView({
                         href={tgInfo.deepLink}
                         target="_blank"
                         rel="noreferrer"
-                        className="flex items-center gap-1.5 rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-ink shadow hover:opacity-90 transition-opacity"
+                        className="flex w-full xs:w-auto items-center justify-center gap-1.5 rounded-xl bg-accent px-4 py-2.5 text-xs font-semibold text-ink shadow hover:opacity-90 transition-opacity min-h-[44px]"
                       >
                         <ExternalLink size={14} /> Abrir no Telegram
                       </a>
@@ -402,7 +426,7 @@ export function ManageView({
                   <button
                     disabled={busy === "tg-code"}
                     onClick={() => void generateTgCode()}
-                    className="flex items-center gap-2 rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-ink shadow hover:opacity-95 transition-opacity disabled:opacity-50"
+                    className="flex w-full xs:w-auto items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-xs font-semibold text-ink shadow hover:opacity-95 transition-opacity disabled:opacity-50 min-h-[44px]"
                   >
                     {busy === "tg-code" ? <LoaderCircle size={14} className="animate-spin" /> : <Sparkles size={14} />}
                     Gerar Código de Conexão
@@ -414,13 +438,13 @@ export function ManageView({
         )}
 
         {/* Recursos e Dicas de Uso */}
-        <div className="mt-4 grid gap-2.5 sm:grid-cols-3 pt-2 border-t border-line/60">
+        <div className="mt-4 grid gap-2.5 grid-cols-1 xs:grid-cols-2 lg:grid-cols-3 pt-2 border-t border-line/60">
           <div className="rounded-xl border border-line/60 bg-cream/[0.015] p-3 text-xs">
             <div className="flex items-center gap-1.5 font-semibold text-cream mb-1">
               <Send size={13} className="text-accent" /> Mensagens em Texto
             </div>
             <p className="text-[11px] text-faint">
-              "Almoço 45 alimentação", "Salário 4500", "Internet 120 recorrente dia 10", "Notebook 3000 10x".
+              &quot;Almoço 45 alimentação&quot;, &quot;Salário 4500&quot;, &quot;Internet 120 recorrente dia 10&quot;, &quot;Notebook 3000 10x&quot;.
             </p>
           </div>
 
@@ -433,7 +457,7 @@ export function ManageView({
             </p>
           </div>
 
-          <div className="rounded-xl border border-line/60 bg-cream/[0.015] p-3 text-xs">
+          <div className="col-span-full xs:col-span-2 lg:col-span-1 rounded-xl border border-line/60 bg-cream/[0.015] p-3 text-xs">
             <div className="flex items-center gap-1.5 font-semibold text-cream mb-1">
               <Camera size={13} className="text-accent" /> Fotos & Comprovantes
             </div>
@@ -445,20 +469,20 @@ export function ManageView({
       </section>
 
       {/* Gastos Fixos Recorrentes Ativos */}
-      <section className="card p-6 border-accent/20">
+      <section className="card card-pad border-accent/20">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
-          <div>
+          <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <span className="grid h-7 w-7 place-items-center rounded-lg bg-accent/15 text-accent">
+              <span className="grid h-7 w-7 place-items-center rounded-lg bg-accent/15 text-accent shrink-0">
                 <Repeat2 size={16} strokeWidth={2.4} />
               </span>
-              <h2 className="font-display text-base font-semibold text-cream">Gastos & Receitas Fixas Recorrentes</h2>
+              <h2 className="font-display text-base font-semibold text-cream truncate">Gastos & Receitas Fixas Recorrentes</h2>
             </div>
             <p className="mt-1 text-xs text-faint">
               Lançamentos cadastrados como fixos ficam disponíveis como modelo e podem ser importados para o mês com 1 clique sempre que você solicitar.
             </p>
           </div>
-          <div className="text-right">
+          <div className="w-full sm:w-auto text-left sm:text-right">
             <p className="text-[11px] text-faint">Total de Despesas Fixas / Mês</p>
             <p className="font-display text-[16px] font-bold text-coral tabular-nums">{fmt(totalFixedExpenses)}</p>
           </div>
@@ -467,7 +491,7 @@ export function ManageView({
         {recurringItems.length === 0 ? (
           <p className="py-6 text-center text-xs text-faint">Nenhum gasto fixo cadastrado ainda.</p>
         ) : (
-          <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-2.5 grid-cols-1 xs:grid-cols-2 xl:grid-cols-3 3xl:grid-cols-4">
             {recurringItems.map((item) => (
               <div key={item.id} className="flex items-center gap-3 rounded-2xl border border-line bg-cream/[0.015] p-3.5">
                 <CategoryIcon icon={item.category.icon} color={item.category.color} chip={36} />
@@ -477,7 +501,7 @@ export function ManageView({
                     {item.category.name} · Dia {item.date.split("-")[2]}
                   </p>
                 </div>
-                <div className="text-right">
+                <div className="text-right shrink-0">
                   <span className={`font-display text-xs font-semibold tabular-nums ${item.type === "income" ? "text-accent" : "text-cream"}`}>
                     {fmt(item.amountCents)}
                   </span>
@@ -490,12 +514,12 @@ export function ManageView({
       </section>
 
       {/* Categorias */}
-      <section className="card p-6">
+      <section className="card card-pad">
         <div className="mb-5">
           <h2 className="font-display text-base font-semibold">Categorias</h2>
           <p className="mt-1 text-xs text-faint">Organize receitas e despesas com suas próprias categorias.</p>
         </div>
-        <div className="grid gap-2 md:grid-cols-[1fr_140px_70px_auto]">
+        <div className="grid gap-2 grid-cols-1 xs:grid-cols-2 lg:grid-cols-[1fr_140px_72px_auto]">
           <input
             className="field"
             placeholder="Nome da categoria"
@@ -513,20 +537,20 @@ export function ManageView({
           <input
             aria-label="Cor"
             type="color"
-            className="field h-[45px] !p-1.5"
+            className="field h-11 w-full !p-1.5 cursor-pointer"
             value={category.color}
             onChange={(event) => setCategory((value) => ({ ...value, color: event.target.value }))}
           />
           <button
             disabled={busy !== null || category.name.trim().length < 2}
             onClick={() => void run("category-new", () => onCreateCategory(category), () => setCategory((value) => ({ ...value, name: "" })))}
-            className="flex items-center justify-center gap-2 rounded-xl bg-accent px-4 text-sm font-semibold text-ink disabled:opacity-30"
+            className="xs:col-span-2 lg:col-span-1 flex items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-ink disabled:opacity-30 min-h-[44px]"
           >
             {busy === "category-new" ? <LoaderCircle size={15} className="animate-spin" /> : <Plus size={15} />}
             Adicionar
           </button>
         </div>
-        <div className="mt-5 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="mt-5 grid gap-2 grid-cols-1 xs:grid-cols-2 xl:grid-cols-3">
           {data.categories.map((item) => (
             <div key={item.id} className="flex items-center gap-3 rounded-2xl border border-line p-3">
               <CategoryIcon icon={item.icon} color={item.color} />
@@ -538,21 +562,21 @@ export function ManageView({
                 aria-label={`Excluir ${item.name}`}
                 disabled={busy !== null}
                 onClick={() => void run(`category-${item.id}`, () => onDeleteCategory(item.id))}
-                className="grid h-8 w-8 place-items-center rounded-lg text-faint hover:bg-coral/10 hover:text-coral"
+                className="grid h-9 w-9 place-items-center rounded-lg text-faint hover:bg-coral/10 hover:text-coral transition-colors"
               >
-                {busy === `category-${item.id}` ? <LoaderCircle size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                {busy === `category-${item.id}` ? <LoaderCircle size={14} className="animate-spin" /> : <Trash2 size={14} />}
               </button>
             </div>
           ))}
         </div>
       </section>
 
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
         {/* Orçamentos */}
-        <section className="card p-6">
+        <section className="card card-pad">
           <h2 className="font-display text-base font-semibold">Orçamentos</h2>
           <p className="mt-1 text-xs text-faint">Crie limites para categorias ainda sem orçamento.</p>
-          <div className="mt-5 grid gap-2 sm:grid-cols-[1fr_150px_auto]">
+          <div className="mt-5 grid gap-2 grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1fr_150px_auto]">
             <select className="field" value={budgetCategory} onChange={(e) => setBudgetCategory(e.target.value)}>
               <option value="">Categoria</option>
               {availableBudgetCategories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
@@ -564,17 +588,17 @@ export function ManageView({
                 setBudgetCategory("");
                 setBudgetAmount("");
               })}
-              className="rounded-xl bg-accent px-4 text-sm font-semibold text-ink disabled:opacity-30"
+              className="sm:col-span-2 lg:col-span-1 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-ink disabled:opacity-30 min-h-[44px]"
             >
               Criar
             </button>
           </div>
           <div className="mt-5 space-y-2">
             {data.budgets.map((item) => (
-              <div key={item.id} className="flex items-center justify-between rounded-xl border border-line px-4 py-3">
-                <span className="text-sm">{categoryById.get(item.categoryId)?.name ?? "Categoria"}</span>
-                <span className="ml-auto mr-3 font-display text-sm text-mute">{fmt(item.amountCents)}</span>
-                <button aria-label="Excluir orçamento" onClick={() => void run(`budget-${item.id}`, () => onDeleteBudget(item.id))} className="text-faint hover:text-coral">
+              <div key={item.id} className="flex items-center justify-between gap-3 rounded-xl border border-line px-4 py-3">
+                <span className="min-w-0 truncate text-sm">{categoryById.get(item.categoryId)?.name ?? "Categoria"}</span>
+                <span className="ml-auto mr-2 font-display text-sm text-mute shrink-0">{fmt(item.amountCents)}</span>
+                <button aria-label="Excluir orçamento" onClick={() => void run(`budget-${item.id}`, () => onDeleteBudget(item.id))} className="grid h-8 w-8 place-items-center rounded-lg text-faint hover:text-coral transition-colors">
                   <Trash2 size={14} />
                 </button>
               </div>
@@ -583,10 +607,10 @@ export function ManageView({
         </section>
 
         {/* Metas */}
-        <section className="card p-6">
+        <section className="card card-pad">
           <h2 className="font-display text-base font-semibold">Metas</h2>
           <p className="mt-1 text-xs text-faint">Crie e encerre objetivos financeiros.</p>
-          <div className="mt-5 grid gap-2 sm:grid-cols-[1fr_150px_auto]">
+          <div className="mt-5 grid gap-2 grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1fr_150px_auto]">
             <input className="field" placeholder="Nome da meta" value={goalName} onChange={(e) => setGoalName(e.target.value)} />
             <input className="field" inputMode="decimal" placeholder="Objetivo em R$" value={goalAmount} onChange={(e) => setGoalAmount(e.target.value)} />
             <button
@@ -600,17 +624,17 @@ export function ManageView({
                 setGoalName("");
                 setGoalAmount("");
               })}
-              className="rounded-xl bg-accent px-4 text-sm font-semibold text-ink disabled:opacity-30"
+              className="sm:col-span-2 lg:col-span-1 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-ink disabled:opacity-30 min-h-[44px]"
             >
               Criar
             </button>
           </div>
           <div className="mt-5 space-y-2">
             {data.goals.map((item) => (
-              <div key={item.id} className="flex items-center justify-between rounded-xl border border-line px-4 py-3">
+              <div key={item.id} className="flex items-center justify-between gap-3 rounded-xl border border-line px-4 py-3">
                 <span className="min-w-0 truncate text-sm">{item.name}</span>
-                <span className="ml-auto mr-3 font-display text-sm text-mute">{fmt(item.currentCents)} / {fmt(item.targetCents)}</span>
-                <button aria-label="Excluir meta" onClick={() => void run(`goal-${item.id}`, () => onDeleteGoal(item.id))} className="text-faint hover:text-coral">
+                <span className="ml-auto mr-2 font-display text-sm text-mute shrink-0">{fmt(item.currentCents)} / {fmt(item.targetCents)}</span>
+                <button aria-label="Excluir meta" onClick={() => void run(`goal-${item.id}`, () => onDeleteGoal(item.id))} className="grid h-8 w-8 place-items-center rounded-lg text-faint hover:text-coral transition-colors">
                   <Trash2 size={14} />
                 </button>
               </div>

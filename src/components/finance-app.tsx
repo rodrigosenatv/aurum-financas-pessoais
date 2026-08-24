@@ -11,21 +11,21 @@ import {
   LayoutDashboard,
   ListChecks,
   LogOut,
+  Menu,
   Plus,
   Settings2,
   Target,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useMemo, useState } from "react";
-import { fmt, fullMonthLabel, greeting, keyFromISO, monthKey, shiftMonth, todayLong } from "@/lib/format";
+import { fmt, fullMonthLabel, greeting, keyFromISO, monthKey, shiftMonth, shortMonthLabel, todayLong } from "@/lib/format";
 import type { BudgetDTO, CategoryDTO, FinanceData, GoalDTO, TransactionDTO, TxnPayload, UserDTO } from "@/lib/types";
 import { ManageView } from "./manage-view";
 import { Overview } from "./overview";
 import { TransactionModal } from "./transaction-modal";
 import { TransactionsView } from "./transactions-view";
 import { AurumLogo } from "./logo";
-
-type View = "overview" | "transactions" | "manage";
+import { BottomNav, NavDrawer, type View } from "./mobile-nav";
 
 const NAV: { id: View; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "overview", label: "Visão geral", icon: LayoutDashboard },
@@ -54,6 +54,7 @@ export function FinanceApp({ initialData, user }: { initialData: FinanceData; us
   const now = new Date();
   const [view, setView] = useState<View>("overview");
   const [month, setMonth] = useState({ y: now.getFullYear(), m: now.getMonth() });
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [modal, setModal] = useState<{ open: boolean; editing: TransactionDTO | null }>({
     open: false,
     editing: null,
@@ -170,7 +171,7 @@ export function FinanceApp({ initialData, user }: { initialData: FinanceData; us
 
   const changeMonth = useCallback((target: { y: number; m: number }) => {
     setMonth(target);
-  }, []);
+  }, [setMonth]);
 
   const importRecurring = useCallback(
     async (targetKey: string) => {
@@ -299,9 +300,9 @@ export function FinanceApp({ initialData, user }: { initialData: FinanceData; us
   };
 
   return (
-    <div className="relative z-10 mx-auto flex min-h-dvh w-full max-w-[1500px] items-start">
+    <div className="relative z-10 mx-auto flex min-h-dvh w-full max-w-[1500px] 3xl:max-w-[1760px] items-start">
       {/* ------------------------------ sidebar ----------------------------- */}
-      <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-line px-5 py-7 lg:flex">
+      <aside className="sticky top-0 hidden h-dvh lg:w-56 xl:w-60 2xl:w-64 shrink-0 flex-col border-r border-line px-5 py-7 lg:flex">
         <div className="px-1">
           <AurumLogo size={36} />
         </div>
@@ -392,22 +393,46 @@ export function FinanceApp({ initialData, user }: { initialData: FinanceData; us
       {/* ------------------------------- main ------------------------------- */}
       <div className="min-w-0 flex-1">
         <header className="sticky top-0 z-30 border-b border-line bg-ink/78 backdrop-blur-xl">
-          {/* mobile bar */}
-          <div className="flex items-center justify-between px-4 pt-4 lg:hidden">
-            <AurumLogo size={32} sublabel={false} />
-            <button
-              onClick={openNew}
-              aria-label="Nova transação"
-              className="grid h-9 w-9 place-items-center rounded-lg bg-accent text-ink active:scale-95"
-            >
-              <Plus size={17} strokeWidth={2.6} />
-            </button>
+          {/* mobile top bar */}
+          <div className="flex items-center justify-between gap-2 px-3 pt-3 pb-2 xs:px-4 sm:px-6 lg:hidden">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setDrawerOpen(true)}
+                aria-label="Abrir menu"
+                className="grid h-11 w-11 place-items-center rounded-xl border border-line text-mute transition-colors hover:border-line-strong hover:text-cream"
+              >
+                <Menu size={20} />
+              </button>
+              <AurumLogo size={30} sublabel={false} />
+            </div>
+
+            {/* Compact mobile month switcher */}
+            <div className="flex items-center rounded-xl border border-line bg-panel p-0.5">
+              <button
+                aria-label="Mês anterior"
+                onClick={() => changeMonth(shiftMonth(month.y, month.m, -1))}
+                className="grid h-9 w-9 place-items-center rounded-lg text-mute transition-colors hover:bg-cream/6 hover:text-cream"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <p className="min-w-[4.8rem] xs:min-w-[7.5rem] px-1 text-center font-display text-[12px] xs:text-[13px] font-semibold capitalize tracking-tight">
+                <span className="xs:hidden">{shortMonthLabel(month.y, month.m)} {month.y}</span>
+                <span className="hidden xs:inline">{fullMonthLabel(month.y, month.m)}</span>
+              </p>
+              <button
+                aria-label="Próximo mês"
+                onClick={() => changeMonth(shiftMonth(month.y, month.m, 1))}
+                className="grid h-9 w-9 place-items-center rounded-lg text-mute transition-colors hover:bg-cream/6 hover:text-cream"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
           </div>
 
-          <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4 px-4 pb-5 pt-4 sm:px-7 lg:pt-8">
+          <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4 px-3 pb-4 pt-2 xs:px-4 sm:px-6 sm:pb-5 sm:pt-4 lg:pt-8 lg:px-7">
             <div>
-              <p className="eyebrow mb-2.5">{todayLong()}</p>
-              <h1 className="font-serif text-[clamp(1.8rem,3.4vw,2.7rem)] leading-[1.04] tracking-[-0.01em] text-cream">
+              <p className="eyebrow mb-1.5 sm:mb-2.5">{todayLong()}</p>
+              <h1 className="font-serif text-[clamp(1.5rem,5.2vw,2.7rem)] leading-[1.06] tracking-[-0.01em] text-cream">
                 {isOverview ? (
                   <>
                     {greeting()},{" "}
@@ -428,14 +453,14 @@ export function FinanceApp({ initialData, user }: { initialData: FinanceData; us
               </h1>
             </div>
 
-            <div className="flex items-center gap-2.5">
+            <div className="hidden items-center gap-2.5 lg:flex">
               <a href={reportUrl("csv")} title="Exportar CSV" className="hidden h-10 items-center gap-1.5 rounded-xl border border-line px-3 text-xs text-mute hover:text-cream sm:flex">
                 <Download size={14} /> CSV
               </a>
               <a href={reportUrl("pdf")} title="Exportar PDF" className="hidden h-10 items-center gap-1.5 rounded-xl border border-line px-3 text-xs text-mute hover:text-cream sm:flex">
                 <Download size={14} /> PDF
               </a>
-              {/* month switcher */}
+              {/* desktop month switcher */}
               <div className="flex items-center rounded-xl border border-line bg-panel p-1">
                 <button
                   aria-label="Mês anterior"
@@ -458,32 +483,16 @@ export function FinanceApp({ initialData, user }: { initialData: FinanceData; us
 
               <button
                 onClick={openNew}
-                className="hidden items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-[13px] font-semibold text-ink transition-all hover:shadow-[0_10px_36px_-10px_rgba(182,242,68,0.55)] active:scale-[0.98] lg:flex"
+                className="flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-[13px] font-semibold text-ink transition-all hover:shadow-[0_10px_36px_-10px_rgba(182,242,68,0.55)] active:scale-[0.98]"
               >
                 <Plus size={15} strokeWidth={2.6} />
                 Nova transação
               </button>
             </div>
           </div>
-
-          {/* mobile tabs */}
-          <div className="flex gap-1 px-4 pb-3 lg:hidden">
-            {NAV.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => setView(item.id)}
-                className={`flex items-center gap-2 rounded-lg px-3 py-2 text-[12.5px] font-medium ${
-                  view === item.id ? "bg-raise text-cream" : "text-mute"
-                }`}
-              >
-                <item.icon size={14} />
-                {item.label}
-              </button>
-            ))}
-          </div>
         </header>
 
-        <main className="px-4 pb-24 pt-7 sm:px-7">
+        <main className="px-3 xs:px-4 sm:px-6 lg:px-7 pb-[calc(6.5rem+env(safe-area-inset-bottom))] pt-5 sm:pt-7 lg:pb-24">
           <AnimatePresence mode="wait">
             <motion.div
               key={view}
@@ -529,6 +538,27 @@ export function FinanceApp({ initialData, user }: { initialData: FinanceData; us
           </AnimatePresence>
         </main>
       </div>
+
+      {/* --------------------------- mobile nav --------------------------- */}
+      <BottomNav
+        view={view}
+        onSelectView={setView}
+        onOpenNew={openNew}
+      />
+
+      <NavDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        user={user}
+        month={month}
+        monthIncome={monthIncome}
+        monthExpense={monthExpense}
+        monthNet={monthNet}
+        onSelectSection={goSection}
+        onOpenNew={openNew}
+        reportUrl={reportUrl}
+        onLogout={logout}
+      />
 
       <TransactionModal
         key={`${modal.open ? "open" : "closed"}-${modal.editing?.id ?? "new"}`}
