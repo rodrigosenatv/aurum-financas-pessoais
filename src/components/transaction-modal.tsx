@@ -102,7 +102,7 @@ export function TransactionModal({
         >
           <motion.button
             aria-label="Fechar"
-            className="absolute inset-0 bg-ink/75 backdrop-blur-md"
+            className="absolute inset-0 bg-ink/88 sm:bg-ink/75 sm:backdrop-blur-md"
             onClick={onClose}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

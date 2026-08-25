@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 import {
   ArrowLeftRight,
   ChartPie,
@@ -11,13 +11,12 @@ import {
   LayoutDashboard,
   ListChecks,
   LogOut,
-  Menu,
   Plus,
   Settings2,
   Target,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useMemo, useState } from "react";
+import { startTransition, useCallback, useMemo, useState } from "react";
 import { fmt, fullMonthLabel, greeting, keyFromISO, monthKey, shiftMonth, shortMonthLabel, todayLong } from "@/lib/format";
 import type { BudgetDTO, CategoryDTO, FinanceData, GoalDTO, TransactionDTO, TxnPayload, UserDTO } from "@/lib/types";
 import { ManageView } from "./manage-view";
@@ -25,7 +24,8 @@ import { Overview } from "./overview";
 import { TransactionModal } from "./transaction-modal";
 import { TransactionsView } from "./transactions-view";
 import { AurumLogo } from "./logo";
-import { BottomNav, NavDrawer, type View } from "./mobile-nav";
+import { BottomNav, MobileMenu, type View } from "./mobile-nav";
+import { useLightMotion } from "@/lib/motion";
 
 const NAV: { id: View; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "overview", label: "Visão geral", icon: LayoutDashboard },
@@ -50,11 +50,11 @@ async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
 export function FinanceApp({ initialData, user }: { initialData: FinanceData; user: UserDTO }) {
   const [data, setData] = useState(initialData);
   const router = useRouter();
+  const light = useLightMotion();
 
   const now = new Date();
   const [view, setView] = useState<View>("overview");
   const [month, setMonth] = useState({ y: now.getFullYear(), m: now.getMonth() });
-  const [drawerOpen, setDrawerOpen] = useState(false);
   const [modal, setModal] = useState<{ open: boolean; editing: TransactionDTO | null }>({
     open: false,
     editing: null,
@@ -305,8 +305,15 @@ export function FinanceApp({ initialData, user }: { initialData: FinanceData; us
 
   /* ------------------------------- helpers ------------------------------- */
 
+  // Troca de view em transition: o React monta a árvore nova (Overview/ManageView
+  // são pesados) sem bloquear a main thread, mantendo a view atual visível até
+  // ficar pronta. Sem isso o mount trava exatamente no frame de entrada.
+  const selectView = useCallback((next: View) => {
+    startTransition(() => setView(next));
+  }, [setView]);
+
   const goSection = (id: string) => {
-    setView("overview");
+    selectView("overview");
     setTimeout(() => {
       document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 80);
@@ -334,7 +341,7 @@ export function FinanceApp({ initialData, user }: { initialData: FinanceData; us
           {NAV.map((item) => (
             <button
               key={item.id}
-              onClick={() => setView(item.id)}
+              onClick={() => selectView(item.id)}
               className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-[13.5px] font-medium transition-all duration-200 ${
                 view === item.id
                   ? "bg-raise text-cream shadow-[inset_0_0_0_1px_rgba(238,242,228,0.06)]"
@@ -415,17 +422,21 @@ export function FinanceApp({ initialData, user }: { initialData: FinanceData; us
 
       {/* ------------------------------- main ------------------------------- */}
       <div className="min-w-0 flex-1">
-        <header className="sticky top-0 z-30 border-b border-line bg-ink/78 backdrop-blur-xl">
+        <header className="sticky top-0 z-30 border-b border-line bg-ink/95 lg:bg-ink/78 lg:backdrop-blur-xl">
           {/* mobile top bar */}
           <div className="flex items-center justify-between gap-2 px-3 pt-3 pb-2 xs:px-4 sm:px-6 lg:hidden">
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => setDrawerOpen(true)}
-                aria-label="Abrir menu"
-                className="grid h-11 w-11 place-items-center rounded-xl border border-line text-mute transition-colors hover:border-line-strong hover:text-cream"
-              >
-                <Menu size={20} />
-              </button>
+              <MobileMenu
+                user={user}
+                month={month}
+                monthIncome={monthIncome}
+                monthExpense={monthExpense}
+                monthNet={monthNet}
+                onSelectSection={goSection}
+                onOpenNew={openNew}
+                reportUrl={reportUrl}
+                onLogout={logout}
+              />
               <AurumLogo size={30} sublabel={false} />
             </div>
 
@@ -516,20 +527,21 @@ export function FinanceApp({ initialData, user }: { initialData: FinanceData; us
         </header>
 
         <main className="px-3 xs:px-4 sm:px-6 lg:px-7 pb-[calc(6.5rem+env(safe-area-inset-bottom))] pt-5 sm:pt-7 lg:pb-24">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={view}
-              initial={{ opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.3, ease: "easeOut" }}
-            >
+          {/* Sem AnimatePresence: o `exit` de mode="wait" adiava o unmount e jogava
+              o mount da view nova em cima do primeiro frame da entrada. Com a key
+              simples + startTransition, a entrada começa já com a árvore montada. */}
+          <motion.div
+            key={view}
+            initial={{ opacity: 0, y: light ? 8 : 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: light ? 0.2 : 0.3, ease: "easeOut" }}
+          >
               {isOverview ? (
                 <Overview
                   data={data}
                   month={month}
                   onEdit={openEdit}
-                  onSeeAll={() => setView("transactions")}
+                  onSeeAll={() => selectView("transactions")}
                   onTogglePaid={togglePaid}
                   onEditBudget={editBudget}
                   onDepositGoal={depositGoal}
@@ -558,30 +570,15 @@ export function FinanceApp({ initialData, user }: { initialData: FinanceData; us
                   onTogglePaid={togglePaid}
                 />
               )}
-            </motion.div>
-          </AnimatePresence>
+          </motion.div>
         </main>
       </div>
 
       {/* --------------------------- mobile nav --------------------------- */}
       <BottomNav
         view={view}
-        onSelectView={setView}
+        onSelectView={selectView}
         onOpenNew={openNew}
-      />
-
-      <NavDrawer
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        user={user}
-        month={month}
-        monthIncome={monthIncome}
-        monthExpense={monthExpense}
-        monthNet={monthNet}
-        onSelectSection={goSection}
-        onOpenNew={openNew}
-        reportUrl={reportUrl}
-        onLogout={logout}
       />
 
       <TransactionModal

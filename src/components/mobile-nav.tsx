@@ -9,12 +9,13 @@ import {
   LayoutDashboard,
   ListChecks,
   LogOut,
+  Menu,
   Plus,
   Settings2,
   Target,
   X,
 } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { fmt, fullMonthLabel } from "@/lib/format";
 import type { UserDTO } from "@/lib/types";
 import { AurumLogo } from "./logo";
@@ -69,7 +70,7 @@ export function BottomNav({
       {/* Bottom Nav Bar */}
       <nav
         aria-label="Navegação móvel"
-        className="fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around border-t border-line bg-ink/92 backdrop-blur-xl pb-[env(safe-area-inset-bottom)] lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around border-t border-line bg-ink/97 pb-[env(safe-area-inset-bottom)] lg:hidden"
       >
         {NAV_ITEMS.map((item) => {
           const active = view === item.id;
@@ -94,22 +95,38 @@ export function BottomNav({
 }
 
 /* -------------------------------------------------------------------------- */
+/* Mobile menu: botão + drawer, com o estado `open` isolado aqui               */
+/* -------------------------------------------------------------------------- */
+
+export type MobileMenuProps = Omit<NavDrawerProps, "open" | "onClose">;
+
+/**
+ * O estado de abertura mora neste componente de propósito. Quando ele vivia no
+ * FinanceApp, alternar o menu re-renderizava toda a árvore de views (Overview
+ * com os gráficos, ManageView), gerando uma long task a cada toque e engasgando
+ * a animação de deslize do drawer.
+ */
+export function MobileMenu(props: MobileMenuProps) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        aria-label="Abrir menu"
+        className="grid h-11 w-11 place-items-center rounded-xl border border-line text-mute transition-colors hover:border-line-strong hover:text-cream"
+      >
+        <Menu size={20} />
+      </button>
+      <NavDrawer {...props} open={open} onClose={() => setOpen(false)} />
+    </>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
 /* Navigation Drawer (Slide-out menu for Mobile / Tablet)                    */
 /* -------------------------------------------------------------------------- */
 
-export function NavDrawer({
-  open,
-  onClose,
-  user,
-  month,
-  monthIncome,
-  monthExpense,
-  monthNet,
-  onSelectSection,
-  onOpenNew,
-  reportUrl,
-  onLogout,
-}: {
+interface NavDrawerProps {
   open: boolean;
   onClose: () => void;
   user: UserDTO;
@@ -121,7 +138,21 @@ export function NavDrawer({
   onOpenNew: () => void;
   reportUrl: (format: "csv" | "pdf") => string;
   onLogout: () => void;
-}) {
+}
+
+function NavDrawer({
+  open,
+  onClose,
+  user,
+  month,
+  monthIncome,
+  monthExpense,
+  monthNet,
+  onSelectSection,
+  onOpenNew,
+  reportUrl,
+  onLogout,
+}: NavDrawerProps) {
   // Lock body scroll when open and handle ESC key
   useEffect(() => {
     if (!open) return;
@@ -149,10 +180,10 @@ export function NavDrawer({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.25 }}
+            transition={{ duration: 0.18, ease: "easeOut" }}
             onClick={onClose}
             aria-hidden="true"
-            className="fixed inset-0 bg-ink/75 backdrop-blur-sm"
+            className="fixed inset-0 bg-ink/82"
           />
 
           {/* Drawer Panel */}
@@ -163,7 +194,7 @@ export function NavDrawer({
             initial={{ x: "-100%" }}
             animate={{ x: 0 }}
             exit={{ x: "-100%" }}
-            transition={{ type: "spring", damping: 28, stiffness: 280 }}
+            transition={{ type: "spring", damping: 34, stiffness: 420, mass: 0.85 }}
             className="relative flex h-full w-[min(320px,85vw)] max-w-sm flex-col overflow-y-auto border-r border-line bg-panel p-5 text-cream shadow-2xl pb-[calc(1.5rem+env(safe-area-inset-bottom))]"
           >
             {/* Header */}

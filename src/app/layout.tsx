@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Instrument_Serif, Inter, Space_Grotesk } from "next/font/google";
 import type { ReactNode } from "react";
+import { MotionProvider } from "@/components/motion-provider";
 import "./globals.css";
 
 const grotesk = Space_Grotesk({
@@ -51,7 +52,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       className={`${grotesk.variable} ${iserif.variable} ${inter.variable}`}
     >
       <body className="min-h-dvh bg-ink font-sans text-cream antialiased overscroll-y-none">
-        {children}
+        <MotionProvider>{children}</MotionProvider>
       </body>
     </html>
   );

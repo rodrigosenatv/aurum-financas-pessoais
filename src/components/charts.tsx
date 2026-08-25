@@ -3,6 +3,7 @@
 import { motion, useSpring, useTransform } from "framer-motion";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { fmt, fmtAxis } from "@/lib/format";
+import { useLightMotion } from "@/lib/motion";
 
 /* ------------------------------------------------------------------------ */
 /* hooks                                                                     */
@@ -25,6 +26,9 @@ export function useMeasure<T extends HTMLElement = HTMLDivElement>() {
   return [ref, size] as const;
 }
 
+const COUNT_SPRING = { stiffness: 46, damping: 15, mass: 0.9 };
+const COUNT_SPRING_LIGHT = { stiffness: 140, damping: 22, mass: 0.6 };
+
 export function Money({
   cents,
   withCents = false,
@@ -34,21 +38,23 @@ export function Money({
   withCents?: boolean;
   className?: string;
 }) {
-  const spring = useSpring(0, { stiffness: 46, damping: 15, mass: 0.9 });
+  const light = useLightMotion();
+  const spring = useSpring(0, light ? COUNT_SPRING_LIGHT : COUNT_SPRING);
   useEffect(() => {
     spring.set(cents);
   }, [cents, spring]);
   const text = useTransform(spring, (v) => fmt(Math.round(v), withCents));
-  return <motion.span className={className}>{text}</motion.span>;
+  return <motion.span className={`num-anim ${className ?? ""}`}>{text}</motion.span>;
 }
 
 export function Percent({ value, className }: { value: number; className?: string }) {
-  const spring = useSpring(0, { stiffness: 46, damping: 15, mass: 0.9 });
+  const light = useLightMotion();
+  const spring = useSpring(0, light ? COUNT_SPRING_LIGHT : COUNT_SPRING);
   useEffect(() => {
     spring.set(value);
   }, [value, spring]);
   const text = useTransform(spring, (v) => `${Math.round(v)}%`);
-  return <motion.span className={className}>{text}</motion.span>;
+  return <motion.span className={`num-anim ${className ?? ""}`}>{text}</motion.span>;
 }
 
 /* ------------------------------------------------------------------------ */
@@ -101,6 +107,7 @@ export function FlowChart({
 }) {
   const [ref, { width }] = useMeasure();
   const [hover, setHover] = useState<number | null>(null);
+  const light = useLightMotion();
 
   const w = Math.max(width, 10);
   const h = w < 420 ? 200 : w < 768 ? 240 : height;
@@ -206,7 +213,7 @@ export function FlowChart({
             fill="url(#gExpense)"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ duration: 1, delay: 0.5 }}
+            transition={{ duration: light ? 0.45 : 1, delay: light ? 0.22 : 0.5 }}
           />
           <motion.path
             key={`a-i-${seriesKey}`}
@@ -214,7 +221,7 @@ export function FlowChart({
             fill="url(#gIncome)"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ duration: 1, delay: 0.35 }}
+            transition={{ duration: light ? 0.45 : 1, delay: light ? 0.16 : 0.35 }}
           />
 
           {/* lines */}
@@ -227,7 +234,7 @@ export function FlowChart({
             strokeLinecap="round"
             initial={{ pathLength: 0 }}
             animate={{ pathLength: 1 }}
-            transition={{ duration: 1.3, ease: EASE }}
+            transition={{ duration: light ? 0.6 : 1.3, ease: EASE }}
           />
           <motion.path
             key={`l-i-${seriesKey}`}
@@ -238,7 +245,7 @@ export function FlowChart({
             strokeLinecap="round"
             initial={{ pathLength: 0 }}
             animate={{ pathLength: 1 }}
-            transition={{ duration: 1.3, ease: EASE, delay: 0.12 }}
+            transition={{ duration: light ? 0.6 : 1.3, ease: EASE, delay: light ? 0.06 : 0.12 }}
           />
 
           {/* hover guides */}
@@ -297,7 +304,7 @@ export function FlowChart({
       {/* tooltip */}
       {hovered && hover !== null && (
         <div
-          className="pointer-events-none absolute z-10 -translate-y-1/2 rounded-xl border border-line-strong bg-[#0d100b]/95 px-3 py-2 sm:px-3.5 sm:py-2.5 shadow-2xl backdrop-blur-md"
+          className="pointer-events-none absolute z-10 -translate-y-1/2 rounded-xl border border-line-strong bg-[#0d100b]/95 px-3 py-2 sm:px-3.5 sm:py-2.5 shadow-2xl lg:backdrop-blur-md"
           style={{
             top: Math.max(54, y(Math.max(hovered.income, hovered.expense))),
             left: tooltipLeft,
@@ -395,7 +402,10 @@ export function Donut({
               strokeDasharray={dash}
               strokeDashoffset={-offset}
               strokeLinecap="butt"
-              initial={{ opacity: 0 }}
+              // strokeWidth precisa estar no `initial`: sem origem resolvida o
+              // framer avisa "undefined is not animatable" e ainda assim escreve
+              // o atributo a cada frame, uma vez por fatia do donut.
+              initial={{ opacity: 0, strokeWidth: stroke }}
               animate={{
                 opacity: active && !isActive ? 0.28 : 1,
                 strokeWidth: isActive ? 31 : stroke,
@@ -443,6 +453,7 @@ export function ProgressRing({
   color?: string;
   delay?: number;
 }) {
+  const light = useLightMotion();
   const clamped = Math.max(0, Math.min(1, value));
   const r = (size - stroke) / 2;
   const C = 2 * Math.PI * r;
@@ -467,7 +478,7 @@ export function ProgressRing({
         strokeDasharray={C}
         initial={{ strokeDashoffset: C }}
         animate={{ strokeDashoffset: C * (1 - clamped) }}
-        transition={{ duration: 1.1, ease: EASE, delay }}
+        transition={{ duration: light ? 0.55 : 1.1, ease: EASE, delay }}
       />
     </svg>
   );
@@ -487,6 +498,7 @@ export function Sparkline({
   height?: number;
 }) {
   const [ref, { width }] = useMeasure();
+  const light = useLightMotion();
   const path = useMemo(() => {
     if (values.length < 2 || width < 20) return { line: "", area: "" };
     const max = Math.max(...values);
@@ -510,7 +522,7 @@ export function Sparkline({
               <stop offset="100%" stopColor={color} stopOpacity="0" />
             </linearGradient>
           </defs>
-          <motion.path d={path.area} fill="url(#gSpark)" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.9, delay: 0.5 }} />
+          <motion.path d={path.area} fill="url(#gSpark)" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: light ? 0.4 : 0.9, delay: light ? 0.2 : 0.5 }} />
           <motion.path
             d={path.line}
             fill="none"
@@ -519,7 +531,7 @@ export function Sparkline({
             strokeLinecap="round"
             initial={{ pathLength: 0 }}
             animate={{ pathLength: 1 }}
-            transition={{ duration: 1.2, ease: EASE, delay: 0.2 }}
+            transition={{ duration: light ? 0.55 : 1.2, ease: EASE, delay: light ? 0.1 : 0.2 }}
           />
         </svg>
       )}

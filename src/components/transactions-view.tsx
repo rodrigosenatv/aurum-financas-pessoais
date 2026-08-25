@@ -159,7 +159,7 @@ export function TransactionsView({
     <div className="space-y-4">
       {/* Banner de Importação de Fixos */}
       {missingRecurring.length > 0 && onImportRecurring && (
-        <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-accent/30 bg-accent/[0.07] p-4.5 text-cream backdrop-blur-md shadow-[0_10px_35px_-15px_rgba(182,242,68,0.2)]">
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-accent/30 bg-accent/[0.07] p-4.5 text-cream lg:backdrop-blur-md shadow-[0_10px_35px_-15px_rgba(182,242,68,0.2)]">
           <div className="flex items-center gap-3">
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-accent text-ink">
               <Repeat2 size={20} strokeWidth={2.4} />

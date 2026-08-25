@@ -30,18 +30,24 @@ import {
   shortMonthLabel,
 } from "@/lib/format";
 import { CategoryIcon } from "@/lib/icons";
+import { useLightMotion } from "@/lib/motion";
 import type { BudgetDTO, FinanceData, GoalDTO, TransactionDTO } from "@/lib/types";
 import { Donut, FlowChart, Money, Percent, ProgressRing, Sparkline, type DonutSlice, type FlowPoint } from "./charts";
 
 /* ------------------------------ primitives ------------------------------ */
 
 function Item({ i, children, className, id }: { i: number; children: ReactNode; className?: string; id?: string }) {
+  const light = useLightMotion();
+  const step = light ? 0.035 : 0.07;
+  // Teto no indice: a partir do 5o card o atraso para de crescer, senao o
+  // ultimo card so comeca a animar 0.6s depois — com todas as camadas vivas.
+  const delay = Math.max(0, 0.05 + Math.min(i, 4) * step);
   return (
     <motion.section
       id={id}
-      initial={{ opacity: 0, y: 22 }}
+      initial={{ opacity: 0, y: light ? 10 : 22 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.55, delay: 0.05 + i * 0.07, ease: [0.22, 1, 0.36, 1] }}
+      transition={{ duration: light ? 0.32 : 0.55, delay, ease: [0.22, 1, 0.36, 1] }}
       className={className}
     >
       {children}
@@ -102,6 +108,7 @@ export function Overview({
   onImportRecurring?: () => Promise<void>;
 }) {
   const key = monthKey(month.y, month.m);
+  const light = useLightMotion();
   const [activeSlice, setActiveSlice] = useState<string | null>(null);
   const [editBudgetId, setEditBudgetId] = useState<number | null>(null);
   const [budgetInput, setBudgetInput] = useState("");
@@ -310,7 +317,7 @@ export function Overview({
       {/* ----------------- Banner Importar Fixos do Mês ----------------- */}
       {missingRecurring.length > 0 && onImportRecurring && (
         <Item i={-0.5}>
-          <div className="flex flex-wrap items-center justify-between gap-3 sm:gap-4 rounded-2xl border border-accent/30 bg-accent/[0.07] card-pad text-cream backdrop-blur-md shadow-[0_10px_35px_-15px_rgba(182,242,68,0.2)]">
+          <div className="flex flex-wrap items-center justify-between gap-3 sm:gap-4 rounded-2xl border border-accent/30 bg-accent/[0.07] card-pad text-cream lg:backdrop-blur-md shadow-[0_10px_35px_-15px_rgba(182,242,68,0.2)]">
             <div className="flex items-center gap-3 min-w-0 flex-1">
               <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-accent text-ink">
                 <Repeat2 size={20} strokeWidth={2.4} />
@@ -412,7 +419,7 @@ export function Overview({
         <Item i={3} className="col-span-full xs:col-span-2 xl:col-span-1">
           <div className="card card-pad flex h-full items-center gap-4 sm:gap-5">
             <div className="relative grid shrink-0 place-items-center">
-              <ProgressRing value={savingsRate / 100} size={76} stroke={7} delay={0.3} />
+              <ProgressRing value={savingsRate / 100} size={76} stroke={7} delay={light ? 0.14 : 0.3} />
               <span className="absolute font-display text-[14px] font-semibold">
                 <Percent value={savingsRate} />
               </span>
@@ -629,11 +636,11 @@ export function Overview({
                       </div>
                       <div className="mt-1.5 h-[5px] overflow-hidden rounded-full bg-cream/7">
                         <motion.div
-                          className="h-full rounded-full"
+                          className="h-full w-full origin-left rounded-full"
                           style={{ background: barColor }}
-                          initial={{ width: 0 }}
-                          animate={{ width: `${Math.min(100, used)}%` }}
-                          transition={{ duration: 0.9, delay: 0.3, ease: "easeOut" }}
+                          initial={{ scaleX: 0 }}
+                          animate={{ scaleX: Math.min(100, used) / 100 }}
+                          transition={{ duration: light ? 0.5 : 0.9, delay: light ? 0.12 : 0.3, ease: "easeOut" }}
                         />
                       </div>
                       <p className="mt-1 text-[10.5px]" style={{ color: over ? "#ff6e82" : warn ? "#eccb6b" : "#5c6154" }}>
@@ -668,7 +675,7 @@ export function Overview({
                   <div key={g.id}>
                     <div className="flex items-center gap-3.5">
                       <div className="relative grid shrink-0 place-items-center">
-                        <ProgressRing value={p} size={62} stroke={6} color={g.color} delay={0.25 + gi * 0.1} />
+                        <ProgressRing value={p} size={62} stroke={6} color={g.color} delay={Math.min(0.25 + gi * 0.1, light ? 0.35 : 0.65)} />
                         <span className="absolute font-display text-[10.5px] font-semibold text-cream">
                           {Math.round(p * 100)}%
                         </span>
@@ -700,7 +707,7 @@ export function Overview({
                           initial={{ height: 0, opacity: 0 }}
                           animate={{ height: "auto", opacity: 1 }}
                           exit={{ height: 0, opacity: 0 }}
-                          transition={{ duration: 0.28, ease: "easeOut" }}
+                          transition={{ duration: light ? 0.2 : 0.28, ease: "easeOut" }}
                           className="overflow-hidden"
                         >
                           <div className="mt-3 flex flex-wrap items-center gap-1.5 pl-0 sm:pl-[76px]">
