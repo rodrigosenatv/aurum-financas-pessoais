@@ -1,4 +1,4 @@
-import { boolean, integer, pgTable, serial, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { boolean, index, integer, pgTable, serial, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 
 export const users = pgTable(
   "users",
@@ -18,63 +18,100 @@ export const users = pgTable(
   (table) => [
     uniqueIndex("users_email_unique").on(table.email),
     uniqueIndex("users_telegram_chat_id_unique").on(table.telegramChatId),
+    index("users_telegram_pair_code_idx").on(table.telegramPairCode),
   ],
 );
 
-export const sessions = pgTable("sessions", {
-  tokenHash: text("token_hash").primaryKey(),
-  userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
-  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+export const sessions = pgTable(
+  "sessions",
+  {
+    tokenHash: text("token_hash").primaryKey(),
+    userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("sessions_user_id_idx").on(table.userId),
+    index("sessions_expires_at_idx").on(table.expiresAt),
+  ],
+);
 
-export const categories = pgTable("categories", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
-  name: text("name").notNull(),
-  icon: text("icon").notNull(),
-  color: text("color").notNull(),
-  type: text("type", { enum: ["income", "expense"] }).notNull(),
-});
+export const categories = pgTable(
+  "categories",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+    name: text("name").notNull(),
+    icon: text("icon").notNull(),
+    color: text("color").notNull(),
+    type: text("type", { enum: ["income", "expense"] }).notNull(),
+  },
+  (table) => [
+    index("categories_user_id_idx").on(table.userId),
+  ],
+);
 
-export const transactions = pgTable("transactions", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
-  description: text("description").notNull(),
-  amountCents: integer("amount_cents").notNull(),
-  type: text("type", { enum: ["income", "expense"] }).notNull(),
-  categoryId: integer("category_id")
-    .references(() => categories.id)
-    .notNull(),
-  date: text("date").notNull(), // ISO yyyy-mm-dd
-  isPaid: boolean("is_paid").default(true).notNull(),
-  isRecurring: boolean("is_recurring").default(false).notNull(),
-  seriesId: text("series_id"),
-  installmentNumber: integer("installment_number"),
-  installmentTotal: integer("installment_total"),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .defaultNow()
-    .notNull(),
-});
+export const transactions = pgTable(
+  "transactions",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+    description: text("description").notNull(),
+    amountCents: integer("amount_cents").notNull(),
+    type: text("type", { enum: ["income", "expense"] }).notNull(),
+    categoryId: integer("category_id")
+      .references(() => categories.id)
+      .notNull(),
+    date: text("date").notNull(), // ISO yyyy-mm-dd
+    isPaid: boolean("is_paid").default(true).notNull(),
+    isRecurring: boolean("is_recurring").default(false).notNull(),
+    seriesId: text("series_id"),
+    installmentNumber: integer("installment_number"),
+    installmentTotal: integer("installment_total"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("transactions_user_id_idx").on(table.userId),
+    index("transactions_user_date_idx").on(table.userId, table.date),
+    index("transactions_user_category_idx").on(table.userId, table.categoryId),
+    index("transactions_user_paid_idx").on(table.userId, table.isPaid),
+    index("transactions_series_id_idx").on(table.seriesId),
+  ],
+);
 
-export const budgets = pgTable("budgets", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
-  categoryId: integer("category_id")
-    .references(() => categories.id)
-    .notNull(),
-  amountCents: integer("amount_cents").notNull(),
-}, (table) => [uniqueIndex("budgets_user_category_unique").on(table.userId, table.categoryId)]);
+export const budgets = pgTable(
+  "budgets",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+    categoryId: integer("category_id")
+      .references(() => categories.id)
+      .notNull(),
+    amountCents: integer("amount_cents").notNull(),
+  },
+  (table) => [
+    uniqueIndex("budgets_user_category_unique").on(table.userId, table.categoryId),
+    index("budgets_user_id_idx").on(table.userId),
+  ],
+);
 
-export const goals = pgTable("goals", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
-  name: text("name").notNull(),
-  icon: text("icon").notNull(),
-  color: text("color").notNull(),
-  targetCents: integer("target_cents").notNull(),
-  currentCents: integer("current_cents").notNull().default(0),
-});
+export const goals = pgTable(
+  "goals",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+    name: text("name").notNull(),
+    icon: text("icon").notNull(),
+    color: text("color").notNull(),
+    targetCents: integer("target_cents").notNull(),
+    currentCents: integer("current_cents").notNull().default(0),
+  },
+  (table) => [
+    index("goals_user_id_idx").on(table.userId),
+  ],
+);
 
 export type Category = typeof categories.$inferSelect;
 export type Transaction = typeof transactions.$inferSelect;

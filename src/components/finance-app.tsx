@@ -15,17 +15,42 @@ import {
   Settings2,
   Target,
 } from "lucide-react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { startTransition, useCallback, useMemo, useState } from "react";
 import { fmt, fullMonthLabel, greeting, keyFromISO, monthKey, shiftMonth, shortMonthLabel, todayLong } from "@/lib/format";
 import type { BudgetDTO, CategoryDTO, FinanceData, GoalDTO, TransactionDTO, TxnPayload, UserDTO } from "@/lib/types";
-import { ManageView } from "./manage-view";
 import { Overview } from "./overview";
-import { TransactionModal } from "./transaction-modal";
-import { TransactionsView } from "./transactions-view";
 import { AurumLogo } from "./logo";
 import { BottomNav, MobileMenu, type View } from "./mobile-nav";
 import { useLightMotion } from "@/lib/motion";
+
+// Dynamic Code Splitting with zero initial blocking
+const TransactionsView = dynamic(
+  () => import("./transactions-view").then((m) => m.TransactionsView),
+  { ssr: false },
+);
+
+const ManageView = dynamic(
+  () => import("./manage-view").then((m) => m.ManageView),
+  { ssr: false },
+);
+
+const TransactionModal = dynamic(
+  () => import("./transaction-modal").then((m) => m.TransactionModal),
+  { ssr: false },
+);
+
+// Instant prefetching on hover/touch
+const preloadTransactions = () => {
+  void import("./transactions-view");
+};
+const preloadManage = () => {
+  void import("./manage-view");
+};
+const preloadModal = () => {
+  void import("./transaction-modal");
+};
 
 const NAV: { id: View; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "overview", label: "Visão geral", icon: LayoutDashboard },
@@ -249,13 +274,14 @@ export function FinanceApp({ initialData, user }: { initialData: FinanceData; us
     [data.goals],
   );
 
-  const createCategory = async (input: Omit<CategoryDTO, "id">) => {
+  const createCategory = useCallback(async (input: Omit<CategoryDTO, "id">) => {
     const created = await requestJson<CategoryDTO>("/api/categories", {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input),
     });
     setData((current) => ({ ...current, categories: [...current.categories, created] }));
-  };
-  const updateCategory = async (id: number, input: Partial<Omit<CategoryDTO, "id">>) => {
+  }, []);
+
+  const updateCategory = useCallback(async (id: number, input: Partial<Omit<CategoryDTO, "id">>) => {
     const updated = await requestJson<CategoryDTO>(`/api/categories/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -277,31 +303,36 @@ export function FinanceApp({ initialData, user }: { initialData: FinanceData; us
           : t,
       ),
     }));
-  };
-  const deleteCategory = async (id: number) => {
+  }, []);
+
+  const deleteCategory = useCallback(async (id: number) => {
     await requestJson(`/api/categories/${id}`, { method: "DELETE" });
     setData((current) => ({ ...current, categories: current.categories.filter((item) => item.id !== id) }));
-  };
-  const createBudget = async (categoryId: number, amountCents: number) => {
+  }, []);
+
+  const createBudget = useCallback(async (categoryId: number, amountCents: number) => {
     const created = await requestJson<BudgetDTO>("/api/budgets", {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ categoryId, amountCents }),
     });
     setData((current) => ({ ...current, budgets: [...current.budgets, created] }));
-  };
-  const deleteBudget = async (id: number) => {
+  }, []);
+
+  const deleteBudget = useCallback(async (id: number) => {
     await requestJson(`/api/budgets/${id}`, { method: "DELETE" });
     setData((current) => ({ ...current, budgets: current.budgets.filter((item) => item.id !== id) }));
-  };
-  const createGoal = async (input: { name: string; targetCents: number; color: string; icon: string }) => {
+  }, []);
+
+  const createGoal = useCallback(async (input: { name: string; targetCents: number; color: string; icon: string }) => {
     const created = await requestJson<GoalDTO>("/api/goals", {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input),
     });
     setData((current) => ({ ...current, goals: [...current.goals, created] }));
-  };
-  const deleteGoal = async (id: number) => {
+  }, []);
+
+  const deleteGoal = useCallback(async (id: number) => {
     await requestJson(`/api/goals/${id}`, { method: "DELETE" });
     setData((current) => ({ ...current, goals: current.goals.filter((item) => item.id !== id) }));
-  };
+  }, []);
 
   /* ------------------------------- helpers ------------------------------- */
 
@@ -312,15 +343,22 @@ export function FinanceApp({ initialData, user }: { initialData: FinanceData; us
     startTransition(() => setView(next));
   }, [setView]);
 
-  const goSection = (id: string) => {
+  const goSection = useCallback((id: string) => {
     selectView("overview");
     setTimeout(() => {
       document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 80);
-  };
+  }, [selectView]);
 
-  const openNew = () => setModal({ open: true, editing: null });
-  const openEdit = (t: TransactionDTO) => setModal({ open: true, editing: t });
+  const openNew = useCallback(() => {
+    preloadModal();
+    setModal({ open: true, editing: null });
+  }, [setModal]);
+
+  const openEdit = useCallback((t: TransactionDTO) => {
+    preloadModal();
+    setModal({ open: true, editing: t });
+  }, [setModal]);
 
   const isOverview = view === "overview";
   const reportUrl = (format: "csv" | "pdf") => `/api/reports/${format}?month=${key}`;
@@ -342,6 +380,14 @@ export function FinanceApp({ initialData, user }: { initialData: FinanceData; us
             <button
               key={item.id}
               onClick={() => selectView(item.id)}
+              onMouseEnter={() => {
+                if (item.id === "transactions") preloadTransactions();
+                if (item.id === "manage") preloadManage();
+              }}
+              onTouchStart={() => {
+                if (item.id === "transactions") preloadTransactions();
+                if (item.id === "manage") preloadManage();
+              }}
               className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-[13.5px] font-medium transition-all duration-200 ${
                 view === item.id
                   ? "bg-raise text-cream shadow-[inset_0_0_0_1px_rgba(238,242,228,0.06)]"
@@ -517,6 +563,8 @@ export function FinanceApp({ initialData, user }: { initialData: FinanceData; us
 
               <button
                 onClick={openNew}
+                onMouseEnter={preloadModal}
+                onTouchStart={preloadModal}
                 className="flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-[13px] font-semibold text-ink transition-all hover:shadow-[0_10px_36px_-10px_rgba(182,242,68,0.55)] active:scale-[0.98]"
               >
                 <Plus size={15} strokeWidth={2.6} />

@@ -13,12 +13,12 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { fmt, fmtSigned, fullDayLabel, keyFromISO, monthKey } from "@/lib/format";
 import { CategoryIcon } from "@/lib/icons";
 import type { FinanceData, TransactionDTO, TxnType } from "@/lib/types";
 
-export function TransactionsView({
+export const TransactionsView = memo(function TransactionsView({
   data,
   month,
   onEdit,
@@ -497,4 +497,4 @@ export function TransactionsView({
       )}
     </div>
   );
-}
+});

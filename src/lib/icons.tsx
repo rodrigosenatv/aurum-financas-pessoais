@@ -1,3 +1,4 @@
+import { memo } from "react";
 import {
   Activity,
   BriefcaseBusiness,
@@ -53,7 +54,7 @@ export const ICON_MAP: Record<string, LucideIcon> = {
   Sparkles,
 };
 
-export function CategoryIcon({
+export const CategoryIcon = memo(function CategoryIcon({
   icon,
   color,
   size = 17,
@@ -82,9 +83,9 @@ export function CategoryIcon({
       <Icon size={size} strokeWidth={1.9} />
     </span>
   );
-}
+});
 
-export function BareIcon({ icon, size = 16 }: { icon: string; size?: number }) {
+export const BareIcon = memo(function BareIcon({ icon, size = 16 }: { icon: string; size?: number }) {
   const Icon = ICON_MAP[icon] ?? Wallet;
   return <Icon size={size} strokeWidth={1.9} />;
-}
+});

@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, useSpring, useTransform } from "framer-motion";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { fmt, fmtAxis } from "@/lib/format";
 import { useLightMotion } from "@/lib/motion";
 
@@ -12,16 +12,24 @@ import { useLightMotion } from "@/lib/motion";
 export function useMeasure<T extends HTMLElement = HTMLDivElement>() {
   const ref = useRef<T | null>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
+  const frameRef = useRef<number | null>(null);
+
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     const ro = new ResizeObserver(([entry]) => {
-      const r = entry.contentRect;
-      setSize({ width: r.width, height: r.height });
+      if (frameRef.current) cancelAnimationFrame(frameRef.current);
+      frameRef.current = requestAnimationFrame(() => {
+        const r = entry.contentRect;
+        setSize((prev) => (prev.width === r.width && prev.height === r.height ? prev : { width: r.width, height: r.height }));
+      });
     });
     ro.observe(el);
     setSize({ width: el.clientWidth, height: el.clientHeight });
-    return () => ro.disconnect();
+    return () => {
+      if (frameRef.current) cancelAnimationFrame(frameRef.current);
+      ro.disconnect();
+    };
   }, []);
   return [ref, size] as const;
 }
@@ -29,7 +37,7 @@ export function useMeasure<T extends HTMLElement = HTMLDivElement>() {
 const COUNT_SPRING = { stiffness: 46, damping: 15, mass: 0.9 };
 const COUNT_SPRING_LIGHT = { stiffness: 140, damping: 22, mass: 0.6 };
 
-export function Money({
+export const Money = memo(function Money({
   cents,
   withCents = false,
   className,
@@ -45,9 +53,9 @@ export function Money({
   }, [cents, spring]);
   const text = useTransform(spring, (v) => fmt(Math.round(v), withCents));
   return <motion.span className={`num-anim ${className ?? ""}`}>{text}</motion.span>;
-}
+});
 
-export function Percent({ value, className }: { value: number; className?: string }) {
+export const Percent = memo(function Percent({ value, className }: { value: number; className?: string }) {
   const light = useLightMotion();
   const spring = useSpring(0, light ? COUNT_SPRING_LIGHT : COUNT_SPRING);
   useEffect(() => {
@@ -55,7 +63,7 @@ export function Percent({ value, className }: { value: number; className?: strin
   }, [value, spring]);
   const text = useTransform(spring, (v) => `${Math.round(v)}%`);
   return <motion.span className={`num-anim ${className ?? ""}`}>{text}</motion.span>;
-}
+});
 
 /* ------------------------------------------------------------------------ */
 /* path helpers                                                              */
@@ -96,7 +104,7 @@ export interface FlowPoint {
 
 const EASE = [0.65, 0, 0.35, 1] as const;
 
-export function FlowChart({
+export const FlowChart = memo(function FlowChart({
   data,
   height = 300,
   seriesKey,
@@ -341,7 +349,7 @@ export function FlowChart({
       )}
     </div>
   );
-}
+});
 
 /* ------------------------------------------------------------------------ */
 /* donut                                                                     */
@@ -354,7 +362,7 @@ export interface DonutSlice {
   color: string;
 }
 
-export function Donut({
+export const Donut = memo(function Donut({
   slices,
   total,
   active,
@@ -434,13 +442,13 @@ export function Donut({
       </div>
     </div>
   );
-}
+});
 
 /* ------------------------------------------------------------------------ */
 /* progress ring                                                             */
 /* ------------------------------------------------------------------------ */
 
-export function ProgressRing({
+export const ProgressRing = memo(function ProgressRing({
   value,
   size = 76,
   stroke = 7,
@@ -482,13 +490,13 @@ export function ProgressRing({
       />
     </svg>
   );
-}
+});
 
 /* ------------------------------------------------------------------------ */
 /* sparkline                                                                 */
 /* ------------------------------------------------------------------------ */
 
-export function Sparkline({
+export const Sparkline = memo(function Sparkline({
   values,
   color = "#b6f244",
   height = 44,
@@ -537,4 +545,4 @@ export function Sparkline({
       )}
     </div>
   );
-}
+});

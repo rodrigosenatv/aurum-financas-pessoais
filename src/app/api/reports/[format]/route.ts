@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { categories, transactions } from "@/db/schema";
-import { apiError } from "@/lib/api";
+import { apiError, sanitizeCsvCell } from "@/lib/api";
 import { requireUser } from "@/lib/auth";
 import { and, desc, eq, like } from "drizzle-orm";
 import { NextResponse } from "next/server";
@@ -8,7 +8,6 @@ import { NextResponse } from "next/server";
 type Ctx = { params: Promise<{ format: string }> };
 const MONTH_RE = /^\d{4}-\d{2}$/;
 const money = (cents: number) => (cents / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2 });
-const csvCell = (value: string | number) => `"${String(value).replace(/"/g, '""')}"`;
 const ascii = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^\x20-\x7e]/g, "-");
 const pdfEscape = (value: string) => ascii(value).replace(/([\\()])/g, "\\$1");
 
@@ -77,7 +76,7 @@ export async function GET(request: Request, ctx: Ctx) {
     if (format === "csv") {
       const header = ["Data", "Descrição", "Tipo", "Categoria", "Parcela", "Valor (R$)"];
       const content = [
-        header.map(csvCell).join(";"),
+        header.map(sanitizeCsvCell).join(";"),
         ...rows.map((row) =>
           [
             row.date,
@@ -86,7 +85,7 @@ export async function GET(request: Request, ctx: Ctx) {
             row.category,
             row.installmentTotal ? `${row.installmentNumber}/${row.installmentTotal}` : "",
             money(row.amountCents),
-          ].map(csvCell).join(";"),
+          ].map(sanitizeCsvCell).join(";"),
         ),
       ].join("\r\n");
       return new Response(`\ufeff${content}`, {

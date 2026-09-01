@@ -1,11 +1,14 @@
+import { randomUUID } from "node:crypto";
 import { db } from "@/db";
 import { budgets, categories, goals, transactions, users } from "@/db/schema";
 import { and, desc, eq, gt, like, sql } from "drizzle-orm";
 import { createPdf } from "@/app/api/reports/[format]/route";
+import { sanitizeCsvCell } from "@/lib/api";
 import { TelegramClient, type TelegramCallbackQuery, type TelegramMessage, type TelegramUpdate } from "./client";
 import { parseAudioWithGemini, parseReceiptWithGemini, parseTextWithGemini } from "./gemini";
 import { parseNaturalLanguage } from "./parser";
 import { checkBudgetAlert } from "./reminders";
+
 
 const money = (cents: number) =>
   (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -438,7 +441,7 @@ export class TelegramHandler {
     if (parsed.installments && parsed.installments > 1) {
       const totalInst = parsed.installments;
       const installmentAmount = Math.round(parsed.amountCents / totalInst);
-      const seriesId = `series_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      const seriesId = randomUUID();
 
       const [baseYear, baseMonth, baseDay] = date.split("-").map(Number);
 
@@ -791,9 +794,8 @@ export class TelegramHandler {
 
     if (format === "csv") {
       const header = ["Data", "Descrição", "Tipo", "Categoria", "Parcela", "Valor (R$)"];
-      const csvCell = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
       const content = [
-        header.map(csvCell).join(";"),
+        header.map(sanitizeCsvCell).join(";"),
         ...rows.map((r) =>
           [
             r.date,
@@ -802,7 +804,7 @@ export class TelegramHandler {
             r.category,
             r.installmentTotal ? `${r.installmentNumber}/${r.installmentTotal}` : "",
             moneyNum(r.amountCents),
-          ].map(csvCell).join(";"),
+          ].map(sanitizeCsvCell).join(";"),
         ),
       ].join("\r\n");
 

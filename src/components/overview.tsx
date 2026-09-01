@@ -17,7 +17,7 @@ import {
   Wallet,
   X,
 } from "lucide-react";
-import { useMemo, useState, type ReactNode } from "react";
+import { memo, useMemo, useState, type ReactNode } from "react";
 import {
   centsToInput,
   dayLabel,
@@ -90,7 +90,7 @@ function Delta({ value, invert = false, suffix = "vs. mês anterior" }: { value:
 
 /* --------------------------------- main --------------------------------- */
 
-export function Overview({
+export const Overview = memo(function Overview({
   data,
   month,
   onEdit,
@@ -154,75 +154,90 @@ export function Overview({
   const missingIncomeCount = missingRecurring.filter((t) => t.type === "income").length;
 
   const m = useMemo(() => {
-    const monthTxns = data.transactions.filter((t) => keyFromISO(t.date) === key);
-    const income = monthTxns.reduce((s, t) => (t.type === "income" ? s + t.amountCents : s), 0);
-    const expense = monthTxns.reduce((s, t) => (t.type === "expense" ? s + t.amountCents : s), 0);
-
-    const paidIncome = monthTxns.reduce(
-      (s, t) => (t.type === "income" && t.isPaid ? s + t.amountCents : s),
-      0,
-    );
-    const pendingIncome = monthTxns.reduce(
-      (s, t) => (t.type === "income" && !t.isPaid ? s + t.amountCents : s),
-      0,
-    );
-
-    const paidExpense = monthTxns.reduce(
-      (s, t) => (t.type === "expense" && t.isPaid ? s + t.amountCents : s),
-      0,
-    );
-    const pendingExpense = monthTxns.reduce(
-      (s, t) => (t.type === "expense" && !t.isPaid ? s + t.amountCents : s),
-      0,
-    );
-
     const prev = shiftMonth(month.y, month.m, -1);
     const prevKey = monthKey(prev.y, prev.m);
-    const prevTxns = data.transactions.filter((t) => keyFromISO(t.date) === prevKey);
-    const prevIncome = prevTxns.reduce((s, t) => (t.type === "income" ? s + t.amountCents : s), 0);
-    const prevExpense = prevTxns.reduce((s, t) => (t.type === "expense" ? s + t.amountCents : s), 0);
 
-    // Saldo Realizado (Apenas o que foi pago/recebido até o mês selecionado)
-    let realizedBalance = 0;
-    const realizedNetByKey = new Map<string, number>();
-    for (const t of data.transactions) {
-      if (!t.isPaid) continue;
-      const k = keyFromISO(t.date);
-      realizedNetByKey.set(k, (realizedNetByKey.get(k) ?? 0) + (t.type === "income" ? t.amountCents : -t.amountCents));
-      if (k <= key) realizedBalance += t.type === "income" ? t.amountCents : -t.amountCents;
+    // Build map of last 6 month keys for flow chart
+    const last6Keys: { key: string; label: string }[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = shiftMonth(month.y, month.m, -i);
+      last6Keys.push({ key: monthKey(d.y, d.m), label: shortMonthLabel(d.y, d.m) });
+    }
+    const last6Map = new Map<string, { income: number; expense: number }>();
+    for (const item of last6Keys) {
+      last6Map.set(item.key, { income: 0, expense: 0 });
     }
 
-    // Saldo Previsto ao fim do mês: Saldo Realizado + Pendências do Mês
+    const monthTxns: TransactionDTO[] = [];
+    let income = 0;
+    let expense = 0;
+    let paidIncome = 0;
+    let pendingIncome = 0;
+    let paidExpense = 0;
+    let pendingExpense = 0;
+    let prevIncome = 0;
+    let prevExpense = 0;
+    let realizedBalance = 0;
+    const realizedNetByKey = new Map<string, number>();
+    const spendByCat = new Map<number, number>();
+
+    // Single pass over all transactions! O(N)
+    for (const t of data.transactions) {
+      const tKey = keyFromISO(t.date);
+
+      // 6-month cash flow map
+      const flowSlot = last6Map.get(tKey);
+      if (flowSlot) {
+        if (t.type === "income") flowSlot.income += t.amountCents;
+        else flowSlot.expense += t.amountCents;
+      }
+
+      // Realized balance
+      if (t.isPaid) {
+        const net = t.type === "income" ? t.amountCents : -t.amountCents;
+        realizedNetByKey.set(tKey, (realizedNetByKey.get(tKey) ?? 0) + net);
+        if (tKey <= key) realizedBalance += net;
+      }
+
+      // Previous month stats
+      if (tKey === prevKey) {
+        if (t.type === "income") prevIncome += t.amountCents;
+        else prevExpense += t.amountCents;
+      }
+
+      // Current selected month
+      if (tKey === key) {
+        monthTxns.push(t);
+        if (t.type === "income") {
+          income += t.amountCents;
+          if (t.isPaid) paidIncome += t.amountCents;
+          else pendingIncome += t.amountCents;
+        } else {
+          expense += t.amountCents;
+          spendByCat.set(t.categoryId, (spendByCat.get(t.categoryId) ?? 0) + t.amountCents);
+          if (t.isPaid) paidExpense += t.amountCents;
+          else pendingExpense += t.amountCents;
+        }
+      }
+    }
+
     const projectedBalance = realizedBalance + (pendingIncome - pendingExpense);
 
-    const flow: FlowPoint[] = [];
     const balanceSeries: number[] = [];
-    const sumBy: (k: string, type: "income" | "expense") => number = (k, type) =>
-      data.transactions
-        .filter((t) => keyFromISO(t.date) === k && t.type === type)
-        .reduce((s, t) => s + t.amountCents, 0);
-
     let rolling = 0;
     for (let i = 11; i >= 0; i--) {
       const d = shiftMonth(month.y, month.m, -i);
       rolling += realizedNetByKey.get(monthKey(d.y, d.m)) ?? 0;
       if (i < 6) balanceSeries.push(rolling);
     }
-    for (let i = 5; i >= 0; i--) {
-      const d = shiftMonth(month.y, month.m, -i);
-      const k = monthKey(d.y, d.m);
-      flow.push({ label: shortMonthLabel(d.y, d.m), income: sumBy(k, "income"), expense: sumBy(k, "expense") });
-    }
 
-    // category spend
-    const spendByCat = new Map<number, number>();
-    for (const t of monthTxns) {
-      if (t.type !== "expense") continue;
-      spendByCat.set(t.categoryId, (spendByCat.get(t.categoryId) ?? 0) + t.amountCents);
-    }
+    const flow: FlowPoint[] = last6Keys.map((item) => {
+      const val = last6Map.get(item.key) ?? { income: 0, expense: 0 };
+      return { label: item.label, income: val.income, expense: val.expense };
+    });
+
     const sorted = [...spendByCat.entries()].sort((a, b) => b[1] - a[1]);
 
-    // Fixed & pending bills checklist
     const bills = monthTxns
       .filter((t) => t.type === "expense" && (t.isRecurring || !t.isPaid))
       .sort((a, b) => {
@@ -819,4 +834,4 @@ export function Overview({
       </div>
     </div>
   );
-}
+});

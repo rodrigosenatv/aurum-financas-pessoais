@@ -22,10 +22,19 @@ export const pool =
   new Pool({
     connectionString: databaseUrl,
     ssl: isRemote ? { rejectUnauthorized: false } : false,
+    max: 15,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 8000,
   });
+
+// Previne crash do processo em caso de queda de conexão ociosa com o PostgreSQL
+pool.on("error", (err) => {
+  console.error("Erro inesperado no pool PostgreSQL do Aurum:", err);
+});
 
 if (process.env.NODE_ENV !== "production") {
   globalForDb.__aurumPostgresqlPool = pool;
 }
 
 export const db = drizzle(pool);
+

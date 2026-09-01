@@ -15,7 +15,7 @@ import {
   Target,
   X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import { fmt, fullMonthLabel } from "@/lib/format";
 import type { UserDTO } from "@/lib/types";
 import { AurumLogo } from "./logo";
@@ -45,7 +45,7 @@ const SECTIONS = [
 /* Bottom Navigation Bar + Floating Action Button (Mobile)                   */
 /* -------------------------------------------------------------------------- */
 
-export function BottomNav({
+export const BottomNav = memo(function BottomNav({
   view,
   onSelectView,
   onOpenNew,
@@ -60,6 +60,7 @@ export function BottomNav({
       <div className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] right-4 z-40 lg:hidden">
         <button
           onClick={onOpenNew}
+          onTouchStart={() => void import("./transaction-modal")}
           aria-label="Nova transação"
           className="grid h-14 w-14 place-items-center rounded-2xl bg-accent text-ink shadow-[0_12px_40px_-6px_rgba(182,242,68,0.6)] transition-transform active:scale-95"
         >
@@ -79,6 +80,10 @@ export function BottomNav({
             <button
               key={item.id}
               onClick={() => onSelectView(item.id)}
+              onTouchStart={() => {
+                if (item.id === "transactions") void import("./transactions-view");
+                if (item.id === "manage") void import("./manage-view");
+              }}
               className={`flex flex-1 flex-col items-center justify-center gap-1 py-2 min-h-[56px] transition-colors ${
                 active ? "text-accent font-semibold" : "text-mute hover:text-cream"
               }`}
@@ -92,7 +97,7 @@ export function BottomNav({
       </nav>
     </>
   );
-}
+});
 
 /* -------------------------------------------------------------------------- */
 /* Mobile menu: botão + drawer, com o estado `open` isolado aqui               */

@@ -1,17 +1,18 @@
-import { randomBytes } from "node:crypto";
+import { randomInt } from "node:crypto";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { apiError } from "@/lib/api";
 import { requireUser } from "@/lib/auth";
 import { TelegramClient } from "@/lib/telegram/client";
+import { checkRateLimit, getClientIdentifier } from "@/lib/rate-limit";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 function generatePairCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let code = "AUR-";
-  for (let i = 0; i < 4; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  for (let i = 0; i < 6; i++) {
+    code += chars.charAt(randomInt(0, chars.length));
   }
   return code;
 }
@@ -59,6 +60,8 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const user = await requireUser();
+    const clientId = getClientIdentifier(request);
+
     const body = (await request.json().catch(() => ({}))) as {
       action?: "generate_code" | "disconnect" | "update_settings" | "test_message";
       notifyDueBills?: boolean;
@@ -68,6 +71,14 @@ export async function POST(request: Request) {
     const action = body.action || "generate_code";
 
     if (action === "generate_code") {
+      const rate = checkRateLimit(`tg-code:${user.id}:${clientId}`, { max: 10, windowSeconds: 60 });
+      if (!rate.allowed) {
+        return NextResponse.json(
+          { error: `Muitas tentativas. Aguarde ${rate.resetSeconds}s para gerar um novo código.` },
+          { status: 429 },
+        );
+      }
+
       const code = generatePairCode();
       const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
@@ -107,8 +118,8 @@ export async function POST(request: Request) {
       await db
         .update(users)
         .set({
-          telegramNotifyDueBills: body.notifyDueBills ?? true,
-          telegramNotifyBudgetLimit: body.notifyBudgetLimit ?? true,
+          telegramNotifyDueBills: typeof body.notifyDueBills === "boolean" ? body.notifyDueBills : true,
+          telegramNotifyBudgetLimit: typeof body.notifyBudgetLimit === "boolean" ? body.notifyBudgetLimit : true,
         })
         .where(eq(users.id, user.id));
 
@@ -116,6 +127,14 @@ export async function POST(request: Request) {
     }
 
     if (action === "test_message") {
+      const rate = checkRateLimit(`tg-test:${user.id}`, { max: 5, windowSeconds: 60 });
+      if (!rate.allowed) {
+        return NextResponse.json(
+          { error: `Limite de testes atingido. Aguarde ${rate.resetSeconds}s.` },
+          { status: 429 },
+        );
+      }
+
       const [row] = await db
         .select({ telegramChatId: users.telegramChatId, name: users.name })
         .from(users)
@@ -146,3 +165,4 @@ export async function POST(request: Request) {
     return apiError(error);
   }
 }
+

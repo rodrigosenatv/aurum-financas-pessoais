@@ -22,7 +22,7 @@ import {
   Zap,
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
-import { useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { fmt, formatCurrencyInput, parseAmount } from "@/lib/format";
 import { BareIcon, CategoryIcon, ICON_MAP } from "@/lib/icons";
 import type { CategoryDTO, FinanceData, TxnType, UserDTO } from "@/lib/types";
@@ -47,7 +47,7 @@ const PRESET_COLORS = [
 
 const AVAILABLE_ICONS = Object.keys(ICON_MAP);
 
-export function ManageView({
+export const ManageView = memo(function ManageView({
   data,
   user,
   onCreateCategory,
@@ -267,11 +267,12 @@ export function ManageView({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const budgeted = useMemo(() => new Set(data.budgets.map((budget) => budget.categoryId)), [data]);
-  const availableBudgetCategories = data.categories.filter(
-    (item) => item.type === "expense" && !budgeted.has(item.id),
+  const budgeted = useMemo(() => new Set(data.budgets.map((budget) => budget.categoryId)), [data.budgets]);
+  const availableBudgetCategories = useMemo(
+    () => data.categories.filter((item) => item.type === "expense" && !budgeted.has(item.id)),
+    [data.categories, budgeted],
   );
-  const categoryById = useMemo(() => new Map(data.categories.map((item) => [item.id, item])), [data]);
+  const categoryById = useMemo(() => new Map(data.categories.map((item) => [item.id, item])), [data.categories]);
 
   // Unique list of active recurring expenses
   const recurringItems = useMemo(() => {
@@ -937,4 +938,4 @@ export function ManageView({
       </AnimatePresence>
     </div>
   );
-}
+});
