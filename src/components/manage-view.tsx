@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
-import { fmt, parseAmount } from "@/lib/format";
+import { fmt, formatCurrencyInput, parseAmount } from "@/lib/format";
 import { BareIcon, CategoryIcon, ICON_MAP } from "@/lib/icons";
 import type { CategoryDTO, FinanceData, TxnType, UserDTO } from "@/lib/types";
 
@@ -687,7 +687,7 @@ export function ManageView({
               <option value="">Categoria</option>
               {availableBudgetCategories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
             </select>
-            <input className="field" inputMode="decimal" placeholder="Limite em R$" value={budgetAmount} onChange={(e) => setBudgetAmount(e.target.value)} />
+            <input className="field" inputMode="numeric" placeholder="Limite em R$" value={budgetAmount} onChange={(e) => setBudgetAmount(formatCurrencyInput(e.target.value))} />
             <button
               disabled={busy !== null || !budgetCategory || !parseAmount(budgetAmount)}
               onClick={() => void run("budget-new", () => onCreateBudget(Number(budgetCategory), parseAmount(budgetAmount)!), () => {
@@ -718,7 +718,7 @@ export function ManageView({
           <p className="mt-1 text-xs text-faint">Crie e encerre objetivos financeiros.</p>
           <div className="mt-5 grid gap-2 grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1fr_150px_auto]">
             <input className="field" placeholder="Nome da meta" value={goalName} onChange={(e) => setGoalName(e.target.value)} />
-            <input className="field" inputMode="decimal" placeholder="Objetivo em R$" value={goalAmount} onChange={(e) => setGoalAmount(e.target.value)} />
+            <input className="field" inputMode="numeric" placeholder="Objetivo em R$" value={goalAmount} onChange={(e) => setGoalAmount(formatCurrencyInput(e.target.value))} />
             <button
               disabled={busy !== null || goalName.trim().length < 2 || !parseAmount(goalAmount)}
               onClick={() => void run("goal-new", () => onCreateGoal({

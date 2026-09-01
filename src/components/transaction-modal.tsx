@@ -3,7 +3,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, LoaderCircle, Repeat2, TrendingDown, TrendingUp, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { parseAmount, todayISO } from "@/lib/format";
+import { centsToInput, formatCurrencyInput, parseAmount, todayISO } from "@/lib/format";
 import { BareIcon } from "@/lib/icons";
 import type { CategoryDTO, TransactionDTO, TxnPayload, TxnType } from "@/lib/types";
 
@@ -22,7 +22,7 @@ export function TransactionModal({
 }) {
   const [type, setType] = useState<TxnType>(editing?.type ?? "expense");
   const [amount, setAmount] = useState(
-    editing ? (editing.amountCents / 100).toFixed(2).replace(".", ",") : "",
+    editing ? centsToInput(editing.amountCents) : "",
   );
   const [description, setDescription] = useState(editing?.description ?? "");
   const [categoryId, setCategoryId] = useState<number | null>(editing?.categoryId ?? null);
@@ -164,9 +164,9 @@ export function TransactionModal({
                 <span className="font-display text-[15px] font-medium text-faint">R$</span>
                 <input
                   ref={amountRef}
-                  inputMode="decimal"
+                  inputMode="numeric"
                   value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
+                  onChange={(e) => setAmount(formatCurrencyInput(e.target.value))}
                   onKeyDown={(e) => e.key === "Enter" && submit()}
                   placeholder="0,00"
                   className="w-full bg-transparent font-display text-[clamp(1.6rem,8vw,2.125rem)] font-semibold tracking-tight text-cream outline-none placeholder:text-cream/15"

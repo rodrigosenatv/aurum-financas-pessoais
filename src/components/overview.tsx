@@ -19,9 +19,11 @@ import {
 } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 import {
+  centsToInput,
   dayLabel,
   fmt,
   fmtSigned,
+  formatCurrencyInput,
   keyFromISO,
   monthKey,
   parseAmount,
@@ -599,9 +601,9 @@ export function Overview({
                       <CategoryIcon icon={cat.icon} color={cat.color} />
                       <input
                         autoFocus
-                        inputMode="decimal"
+                        inputMode="numeric"
                         value={budgetInput}
-                        onChange={(e) => setBudgetInput(e.target.value)}
+                        onChange={(e) => setBudgetInput(formatCurrencyInput(e.target.value))}
                         onKeyDown={(e) => e.key === "Enter" && submitBudget(b)}
                         placeholder="novo limite"
                         className="field !py-2 text-[13px]"
@@ -650,7 +652,7 @@ export function Overview({
                     <button
                       onClick={() => {
                         setEditBudgetId(b.id);
-                        setBudgetInput((b.amountCents / 100).toFixed(0));
+                        setBudgetInput(centsToInput(b.amountCents));
                       }}
                       className="hover-reveal [@media(hover:hover)]:opacity-0 grid h-8 w-8 sm:h-7 sm:w-7 shrink-0 place-items-center self-start rounded-md text-faint transition-all hover:bg-cream/6 hover:text-cream group-hover:opacity-100"
                       aria-label={`Editar limite de ${cat.name}`}
@@ -723,10 +725,10 @@ export function Overview({
                             ))}
                             <div className="flex min-w-0 flex-1 items-center gap-1.5 w-full xs:w-auto">
                               <input
-                                inputMode="decimal"
+                                inputMode="numeric"
                                 placeholder="outro valor"
                                 value={depositInput}
-                                onChange={(e) => setDepositInput(e.target.value)}
+                                onChange={(e) => setDepositInput(formatCurrencyInput(e.target.value))}
                                 onKeyDown={(e) => e.key === "Enter" && submitDeposit(g)}
                                 className="field !rounded-lg !px-2.5 !py-1.5 text-[11.5px] min-h-[38px]"
                               />

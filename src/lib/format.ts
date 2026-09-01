@@ -124,6 +124,31 @@ export function parseAmount(str: string): number | null {
   return Math.max(0, Math.round(v * 100));
 }
 
+/**
+ * Formats user input as Brazilian currency with auto-calculated decimal places and comma.
+ * e.g. "9" -> "0,09", "90" -> "0,90", "900" -> "9,00", "9000" -> "90,00", "900000" -> "9.000,00".
+ * Allows only digits and handles backspacing and typing seamlessly.
+ */
+export function formatCurrencyInput(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 11);
+  if (!digits) return "";
+  const num = parseInt(digits, 10);
+  if (num === 0) return "";
+  return (num / 100).toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+/** Formats integer cents directly to the masked input string format (e.g. 9000 -> "90,00") */
+export function centsToInput(cents: number): string {
+  if (!cents || cents <= 0) return "";
+  return (cents / 100).toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
 export function shiftMonth(y: number, m: number, delta: number): { y: number; m: number } {
   const d = new Date(y, m + delta, 1);
   return { y: d.getFullYear(), m: d.getMonth() };

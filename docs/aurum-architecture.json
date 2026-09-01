@@ -1,0 +1,230 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "AURUM - Arquitetura do Sistema de Finanças Pessoais",
+    "output": "aurum-architecture.html",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "full-overview",
+        "label": "Visão Geral Completa",
+        "focus": ["web_user", "nextjs_frontend", "api_handlers", "drizzle_layer", "supabase_postgres"],
+        "note": "Fluxo principal da aplicação web desde a interface do usuário até o banco de dados Supabase."
+      },
+      {
+        "id": "telegram-ai-flow",
+        "label": "Assistente Telegram & IA",
+        "focus": ["telegram_user", "telegram_engine", "gemini_nlp", "api_handlers", "drizzle_layer"],
+        "note": "Fluxo conversacional: registro de despesas por áudio/texto com extração de entidades via Google Gemini."
+      },
+      {
+        "id": "auth-security",
+        "label": "Autenticação & Segurança",
+        "focus": ["web_user", "nextjs_frontend", "api_handlers", "auth_security"],
+        "note": "Validação de credenciais, geração de sessões seguras e hash criptográfico de senhas."
+      },
+      {
+        "id": "data-persistence",
+        "label": "Camada de Dados & ORM",
+        "focus": ["api_handlers", "drizzle_layer", "supabase_postgres"],
+        "note": "Consultas type-safe com Drizzle ORM e persistência relacional no PostgreSQL do Supabase."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "web_user",
+      "type": "external",
+      "label": "Web Client",
+      "sublabel": "Desktop / Mobile",
+      "brand": "react",
+      "pos": [40, 180],
+      "size": [130, 68]
+    },
+    {
+      "id": "telegram_user",
+      "type": "external",
+      "label": "Telegram Client",
+      "sublabel": "Áudio & Texto",
+      "brand": "telegram",
+      "pos": [40, 350],
+      "size": [130, 68]
+    },
+    {
+      "id": "nextjs_frontend",
+      "type": "frontend",
+      "label": "AURUM Web App",
+      "sublabel": "Next.js 16 / React 19",
+      "brand": "next-js",
+      "tag": "Tailwind CSS",
+      "pos": [260, 180],
+      "size": [150, 68]
+    },
+    {
+      "id": "telegram_engine",
+      "type": "backend",
+      "label": "Telegram Service",
+      "sublabel": "Webhook & Runner",
+      "brand": "telegram",
+      "tag": "Bot Engine",
+      "pos": [260, 350],
+      "size": [150, 68]
+    },
+    {
+      "id": "auth_security",
+      "type": "security",
+      "label": "Auth & Security",
+      "sublabel": "Sessões & Senhas",
+      "tag": "Argon2 / Scrypt",
+      "pos": [490, 50],
+      "size": [150, 68]
+    },
+    {
+      "id": "api_handlers",
+      "type": "backend",
+      "label": "API Route Handlers",
+      "sublabel": "Transactions, Budgets, Goals",
+      "tag": "Next.js API",
+      "pos": [490, 180],
+      "size": [150, 68]
+    },
+    {
+      "id": "gemini_nlp",
+      "type": "cloud",
+      "label": "Google Gemini AI",
+      "sublabel": "NLP & Extração",
+      "brand": "google-gemini",
+      "tag": "Multimodal AI",
+      "pos": [490, 500],
+      "size": [150, 68]
+    },
+    {
+      "id": "drizzle_layer",
+      "type": "backend",
+      "label": "Drizzle ORM",
+      "sublabel": "Type-Safe DB Client",
+      "tag": "Drizzle Kit",
+      "pos": [720, 180],
+      "size": [140, 68]
+    },
+    {
+      "id": "supabase_postgres",
+      "type": "database",
+      "label": "Supabase PostgreSQL",
+      "sublabel": "Relational DB :5432",
+      "brand": "supabase",
+      "tag": "Primary Store",
+      "pos": [940, 180],
+      "size": [150, 68]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "AURUM Application Runtime (Next.js / Vercel)",
+      "wraps": ["nextjs_frontend", "api_handlers", "telegram_engine", "auth_security", "drizzle_layer"]
+    },
+    {
+      "kind": "region",
+      "label": "Supabase Cloud Platform",
+      "wraps": ["supabase_postgres"]
+    }
+  ],
+  "connections": [
+    {
+      "id": "web-to-fe",
+      "from": "web_user",
+      "to": "nextjs_frontend",
+      "label": "HTTPS / UI",
+      "variant": "emphasis"
+    },
+    {
+      "id": "tg-to-engine",
+      "from": "telegram_user",
+      "to": "telegram_engine",
+      "label": "Voice / Text",
+      "variant": "emphasis"
+    },
+    {
+      "id": "fe-to-api",
+      "from": "nextjs_frontend",
+      "to": "api_handlers",
+      "label": "REST Fetch",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "api-to-auth",
+      "from": "api_handlers",
+      "to": "auth_security",
+      "label": "Validar Sessão",
+      "variant": "security",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "id": "tg-to-gemini",
+      "from": "telegram_engine",
+      "to": "gemini_nlp",
+      "label": "NLP Áudio/Texto",
+      "variant": "emphasis",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "tg-to-api",
+      "from": "telegram_engine",
+      "to": "api_handlers",
+      "label": "Salvar Transação",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "api-to-drizzle",
+      "from": "api_handlers",
+      "to": "drizzle_layer",
+      "label": "Consultas ORM",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "drizzle-to-db",
+      "from": "drizzle_layer",
+      "to": "supabase_postgres",
+      "label": "SQL :5432",
+      "variant": "emphasis",
+      "fromSide": "right",
+      "toSide": "left"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Frontend & Interface",
+      "items": [
+        "Dashboard financeiro reativo com Next.js 16, React 19 e Tailwind CSS v4",
+        "Framer Motion para transições fluidas de abas e modais responsivos",
+        "Visualização de visão geral, fluxo de transações, orçamentos e metas"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Automação & IA Multimodal",
+      "items": [
+        "Bot Telegram integrado para registro rápido de receitas e despesas",
+        "Google Gemini para extração inteligente de categoria, valor e descrição em mensagens e áudio",
+        "Lembretes automáticos e alertas de teto de orçamento via Telegram"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Backend, Segurança & Persistência",
+      "items": [
+        "Route Handlers RESTful para CRUD e tarefas agendadas via Cron",
+        "Autenticação por cookies com hash seguro de senhas",
+        "Persistência em PostgreSQL no Supabase com Drizzle ORM type-safe"
+      ]
+    }
+  ]
+}
