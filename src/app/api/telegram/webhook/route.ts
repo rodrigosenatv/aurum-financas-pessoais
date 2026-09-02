@@ -22,8 +22,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       }
     } else if (process.env.NODE_ENV === "production") {
-      console.warn("TELEGRAM_WEBHOOK_SECRET não configurado em ambiente de produção.");
-      return NextResponse.json({ error: "Webhook secret não configurado." }, { status: 503 });
+      console.warn("[Telegram Webhook] TELEGRAM_WEBHOOK_SECRET não configurado. Processando update em modo padrão.");
     }
 
     const body = (await request.json().catch(() => null)) as TelegramUpdate | null;

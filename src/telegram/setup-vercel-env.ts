@@ -10,7 +10,9 @@ const envVars: Record<string, string | undefined> = {
   NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN,
   TELEGRAM_BOT_NAME: process.env.TELEGRAM_BOT_NAME,
+  TELEGRAM_WEBHOOK_SECRET: process.env.TELEGRAM_WEBHOOK_SECRET,
   GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+  CRON_SECRET: process.env.CRON_SECRET,
 };
 
 const targets = ["production", "development"];

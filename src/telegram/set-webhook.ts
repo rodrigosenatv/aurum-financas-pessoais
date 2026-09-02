@@ -9,10 +9,16 @@ async function main() {
   if (!token) throw new Error("TELEGRAM_BOT_TOKEN missing");
 
   const client = new TelegramClient(token);
-  const webhookUrl = "https://aurum-financas-pessoais.vercel.app/api/telegram/webhook";
+  const webhookUrl =
+    process.env.TELEGRAM_WEBHOOK_URL ||
+    "https://aurum-financas-pessoais.vercel.app/api/telegram/webhook";
+  const secretToken = process.env.TELEGRAM_WEBHOOK_SECRET || undefined;
 
   console.log(`Setting webhook to: ${webhookUrl}...`);
-  const result = await client.setWebhook(webhookUrl);
+  if (secretToken) {
+    console.log("Using secret_token for webhook security.");
+  }
+  const result = await client.setWebhook(webhookUrl, secretToken);
   console.log("Webhook result:", result);
 }
 
