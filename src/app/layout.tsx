@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Instrument_Serif, Inter, Space_Grotesk } from "next/font/google";
 import type { ReactNode } from "react";
 import { MotionProvider } from "@/components/motion-provider";
+import { PwaProvider } from "@/components/pwa-provider";
 import "./globals.css";
 
 const grotesk = Space_Grotesk({
@@ -35,13 +36,27 @@ export const metadata: Metadata = {
   title: "aurum · finanças pessoais",
   description:
     "Tracker de finanças pessoais: visão geral do seu dinheiro, fluxo de caixa, orçamentos e metas.",
+  applicationName: "Aurum",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Aurum",
+  },
+  formatDetection: {
+    telephone: false,
+  },
+  manifest: "/manifest.webmanifest",
   icons: {
     icon: [
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
       { url: "/icon.svg", type: "image/svg+xml" },
       { url: "/favicon.svg", type: "image/svg+xml" },
     ],
-    shortcut: "/icon.svg",
-    apple: "/icon.svg",
+    shortcut: "/icon-192.png",
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    ],
   },
 };
 
@@ -52,8 +67,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       className={`${grotesk.variable} ${iserif.variable} ${inter.variable}`}
     >
       <body className="min-h-dvh bg-ink font-sans text-cream antialiased overscroll-y-none">
-        <MotionProvider>{children}</MotionProvider>
+        <MotionProvider>
+          {children}
+          <PwaProvider />
+        </MotionProvider>
       </body>
     </html>
   );
 }
+
