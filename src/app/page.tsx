@@ -6,6 +6,8 @@ import { getCurrentUser } from "@/lib/auth";
 import type { FinanceData } from "@/lib/types";
 import { desc, eq } from "drizzle-orm";
 
+export const dynamic = "force-dynamic";
+
 async function loadData(userId: number): Promise<FinanceData> {
   const [cats, txns, bds, gls] = await Promise.all([
     db.select().from(categories).where(eq(categories.userId, userId)).orderBy(categories.id),
