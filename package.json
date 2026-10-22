@@ -13,6 +13,8 @@
     "icons:generate": "node scripts/generate-pwa-icons.js"
   },
   "dependencies": {
+    "@neon/config": "^1.9.3",
+    "@neon/env": "^1.6.4",
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.111.0",
     "dotenv": "17.3.1",

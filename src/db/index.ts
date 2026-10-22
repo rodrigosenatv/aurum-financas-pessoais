@@ -15,6 +15,7 @@ const globalForDb = globalThis as typeof globalThis & {
 const isRemote =
   databaseUrl.includes("supabase.com") ||
   databaseUrl.includes("supabase.co") ||
+  databaseUrl.includes("neon.tech") ||
   (!databaseUrl.includes("127.0.0.1") && !databaseUrl.includes("localhost"));
 
 export const pool =

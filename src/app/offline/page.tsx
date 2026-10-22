@@ -2,6 +2,7 @@
 
 import { AurumEmblem } from "@/components/logo";
 import { RefreshCw, WifiOff } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 
 export default function OfflinePage() {
@@ -48,12 +49,12 @@ export default function OfflinePage() {
             {retrying ? "Reconectando..." : "Tentar reconectar"}
           </button>
 
-          <a
+          <Link
             href="/"
             className="flex h-12 w-full items-center justify-center rounded-xl border border-border bg-surface-1 text-sm font-medium text-cream hover:bg-surface-2 transition-colors"
           >
             Voltar para o início
-          </a>
+          </Link>
         </div>
       </div>
     </main>

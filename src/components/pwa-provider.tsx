@@ -30,22 +30,31 @@ export function PwaProvider() {
   const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null);
 
   // Network Status State
-  const [isOnline, setIsOnline] = useState<boolean>(true);
+  const [isOnline, setIsOnline] = useState<boolean>(() =>
+    typeof navigator !== "undefined" ? navigator.onLine : true,
+  );
   const [showReconnected, setShowReconnected] = useState(false);
 
   // Install Prompt State
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
-  const [isIosDevice, setIsIosDevice] = useState(false);
+  const [isIosDevice] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    const ua = window.navigator.userAgent;
+    return /iPhone|iPad|iPod/i.test(ua) && !(window as unknown as { MSStream?: unknown }).MSStream;
+  });
   const [showIosGuide, setShowIosGuide] = useState(false);
-  const [isStandalone, setIsStandalone] = useState(false);
+  const [isStandalone] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return (
+      window.matchMedia("(display-mode: standalone)").matches ||
+      (window.navigator as unknown as { standalone?: boolean }).standalone === true
+    );
+  });
 
   // 1. Service Worker Registration & Updates
   useEffect(() => {
     if (typeof window === "undefined") return;
-
-    // Check online status initially
-    setIsOnline(navigator.onLine);
 
     const handleOnline = () => {
       setIsOnline(true);
@@ -60,17 +69,6 @@ export function PwaProvider() {
 
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
-
-    // Detect standalone display mode
-    const standaloneCheck =
-      window.matchMedia("(display-mode: standalone)").matches ||
-      (window.navigator as unknown as { standalone?: boolean }).standalone === true;
-    setIsStandalone(standaloneCheck);
-
-    // Detect iOS
-    const ua = window.navigator.userAgent;
-    const isIos = /iPhone|iPad|iPod/i.test(ua) && !(window as unknown as { MSStream?: unknown }).MSStream;
-    setIsIosDevice(isIos);
 
     // Register Service Worker
     if ("serviceWorker" in navigator && window.location.protocol.startsWith("http")) {
