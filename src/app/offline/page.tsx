@@ -14,45 +14,30 @@ export default function OfflinePage() {
   };
 
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center p-6 text-center bg-ink text-cream selection:bg-accent selection:text-ink">
-      {/* Background ambient glow */}
-      <div className="pointer-events-none absolute -top-40 left-1/2 -translate-x-1/2 w-96 h-96 rounded-full bg-accent/5 blur-[120px]" />
-
-      <div className="relative z-10 flex max-w-sm flex-col items-center">
-        {/* Aurum Logo */}
+    <main className="relative z-10 flex min-h-dvh flex-col items-center justify-center px-6 pt-[max(1.5rem,var(--safe-t))] pb-[max(1.5rem,var(--safe-b))] text-center">
+      <div className="relative flex w-full max-w-sm flex-col items-center">
         <div className="relative mb-6">
           <AurumEmblem size={72} />
-          <div className="absolute -bottom-2 -right-2 grid h-8 w-8 place-items-center rounded-full bg-surface-2 border border-border/80 text-accent shadow-lg">
-            <WifiOff size={16} />
+          <div className="absolute -right-2 -bottom-2 grid h-9 w-9 place-items-center rounded-full border border-line-strong bg-surface text-warning shadow-pop">
+            <WifiOff size={17} />
           </div>
         </div>
 
-        <span className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-accent/20 bg-accent/10 px-3 py-0.5 text-xs font-medium text-accent">
-          Modo Offline
-        </span>
+        <span className="chip mb-3 bg-warning/12 text-warning">Sem conexão</span>
 
-        <h1 className="mt-1 font-serif text-3xl italic tracking-wide text-cream">
-          Você está desconectado
-        </h1>
+        <h1 className="font-serif text-[2rem] leading-tight text-fg">Você está offline</h1>
 
-        <p className="mt-3 text-sm leading-relaxed text-cream-muted">
-          Não conseguimos conectar aos servidores da Aurum. Suas configurações em cache continuam salvas e você poderá sincronizar novos lançamentos assim que a conexão retornar.
+        <p className="mt-3 text-[14px] leading-relaxed text-fg-muted">
+          Não conseguimos falar com os servidores do Aurum. Assim que a internet voltar, é só tentar de novo — nada do que
+          você já salvou se perde.
         </p>
 
-        <div className="mt-8 flex w-full flex-col gap-3">
-          <button
-            onClick={handleRetry}
-            disabled={retrying}
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-accent font-medium text-ink transition-transform active:scale-95 disabled:opacity-50"
-          >
+        <div className="mt-8 flex w-full flex-col gap-2.5">
+          <button type="button" onClick={handleRetry} disabled={retrying} className="btn btn-primary min-h-12 w-full">
             <RefreshCw size={18} className={retrying ? "animate-spin" : ""} />
-            {retrying ? "Reconectando..." : "Tentar reconectar"}
+            {retrying ? "Reconectando…" : "Tentar novamente"}
           </button>
-
-          <Link
-            href="/"
-            className="flex h-12 w-full items-center justify-center rounded-xl border border-border bg-surface-1 text-sm font-medium text-cream hover:bg-surface-2 transition-colors"
-          >
+          <Link href="/" className="btn btn-secondary min-h-12 w-full">
             Voltar para o início
           </Link>
         </div>

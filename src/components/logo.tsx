@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import { useId } from "react";
 
 interface LogoProps {
   size?: number;
@@ -10,6 +10,16 @@ interface LogoProps {
 }
 
 export function AurumEmblem({ size = 36, className = "" }: { size?: number; className?: string }) {
+  // IDs únicos por instância: com IDs fixos, um emblema dentro de um container
+  // `display:none` (ex.: a sidebar no celular) "levava" os gradientes junto e as
+  // outras cópias renderizavam sem preenchimento.
+  const uid = useId().replace(/:/g, "");
+  const bg = `${uid}-bg`;
+  const border = `${uid}-border`;
+  const gold = `${uid}-gold`;
+  const leaf = `${uid}-leaf`;
+  const shadow = `${uid}-shadow`;
+
   return (
     <svg
       width={size}
@@ -17,49 +27,48 @@ export function AurumEmblem({ size = 36, className = "" }: { size?: number; clas
       viewBox="0 0 512 512"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
+      aria-hidden
       className={`shrink-0 select-none ${className}`}
     >
       <defs>
-        <linearGradient id="aurumEmblemBg" x1="0%" y1="0%" x2="100%" y2="100%">
+        <linearGradient id={bg} x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stopColor="#182210" />
           <stop offset="50%" stopColor="#0b1007" />
           <stop offset="100%" stopColor="#050704" />
         </linearGradient>
-        <linearGradient id="aurumEmblemBorder" x1="0%" y1="0%" x2="100%" y2="100%">
+        <linearGradient id={border} x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stopColor="#b6f244" stopOpacity="0.85" />
           <stop offset="50%" stopColor="#eccb6b" stopOpacity="0.4" />
           <stop offset="100%" stopColor="#b6f244" stopOpacity="0.2" />
         </linearGradient>
-        <linearGradient id="aurumEmblemGold" x1="0%" y1="0%" x2="100%" y2="100%">
+        <linearGradient id={gold} x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stopColor="#dbfb73" />
           <stop offset="45%" stopColor="#b6f244" />
           <stop offset="85%" stopColor="#84c519" />
           <stop offset="100%" stopColor="#e8cd68" />
         </linearGradient>
-        <linearGradient id="aurumEmblemLeaf" x1="0%" y1="100%" x2="100%" y2="0%">
+        <linearGradient id={leaf} x1="0%" y1="100%" x2="100%" y2="0%">
           <stop offset="0%" stopColor="#7ebc16" />
           <stop offset="60%" stopColor="#b6f244" />
           <stop offset="100%" stopColor="#f5e28a" />
         </linearGradient>
-        <filter id="aurumEmblemShadow" x="-20%" y="-20%" width="140%" height="140%">
+        <filter id={shadow} x="-20%" y="-20%" width="140%" height="140%">
           <feDropShadow dx="0" dy="10" stdDeviation="14" floodColor="#000" floodOpacity="0.5" />
           <feDropShadow dx="0" dy="4" stdDeviation="6" floodColor="#b6f244" floodOpacity="0.35" />
         </filter>
       </defs>
 
-      {/* Outer Rounded Container */}
-      <rect x="24" y="24" width="464" height="464" rx="112" fill="url(#aurumEmblemBg)" />
-      <rect x="24" y="24" width="464" height="464" rx="112" fill="none" stroke="url(#aurumEmblemBorder)" strokeWidth="12" />
+      <rect x="24" y="24" width="464" height="464" rx="112" fill={`url(#${bg})`} />
+      <rect x="24" y="24" width="464" height="464" rx="112" fill="none" stroke={`url(#${border})`} strokeWidth="12" />
 
-      {/* Emblem Vectors */}
-      <g filter="url(#aurumEmblemShadow)">
+      <g filter={`url(#${shadow})`}>
         <path
           d="M256 108 C256 108 368 236 368 324 C368 376 324 404 274 404 C236 404 204 384 192 352 C216 352 248 338 266 316 C288 290 292 254 284 224 L256 108 Z"
-          fill="url(#aurumEmblemGold)"
+          fill={`url(#${gold})`}
         />
         <path
           d="M256 108 C256 108 144 236 144 324 C144 366 172 396 210 402 C196 376 196 342 208 314 C222 282 250 252 256 214 L256 108 Z"
-          fill="url(#aurumEmblemLeaf)"
+          fill={`url(#${leaf})`}
           opacity="0.95"
         />
         <path
@@ -78,16 +87,14 @@ export function AurumLogo({ size = 36, showText = true, sublabel = true, classNa
   }
 
   return (
-    <div className={`flex items-center gap-3 select-none ${className}`}>
+    <div className={`flex items-center gap-2.5 select-none ${className}`}>
       <AurumEmblem size={size} />
       <div className="min-w-0">
-        <h1 className="font-display text-[19px] font-bold leading-none tracking-tight text-cream">
+        <p className="font-display text-[19px] font-bold leading-none tracking-tight text-fg">
           aurum<span className="text-accent">.</span>
-        </h1>
+        </p>
         {sublabel && (
-          <p className="mt-1 text-[10px] font-medium tracking-[0.2em] uppercase text-faint">
-            finanças pessoais
-          </p>
+          <p className="mt-1 text-[10px] font-medium tracking-[0.2em] uppercase text-fg-subtle">finanças pessoais</p>
         )}
       </div>
     </div>

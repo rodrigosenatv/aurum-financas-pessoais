@@ -2,10 +2,12 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  Check,
   ChevronDown,
   Clock,
+  LoaderCircle,
   Pencil,
+  Plus,
+  ReceiptText,
   Repeat2,
   Search,
   SearchX,
@@ -14,14 +16,28 @@ import {
   X,
 } from "lucide-react";
 import { memo, useMemo, useState } from "react";
-import { fmt, fmtSigned, fullDayLabel, keyFromISO, monthKey } from "@/lib/format";
+import { fmt, fmtSigned, fullDayLabel, keyFromISO, monthKey, monthLabel } from "@/lib/format";
 import { CategoryIcon } from "@/lib/icons";
 import type { FinanceData, TransactionDTO, TxnType } from "@/lib/types";
+import { describeCounts, useMissingRecurring } from "@/lib/use-missing-recurring";
+import { EmptyState, PaidToggle } from "./ui";
+
+type Status = "all" | "pending" | "paid" | "recurring";
+
+const PAGE = 40;
+
+const signedNet = (cents: number) => `${cents >= 0 ? "+" : "−"} ${fmt(Math.abs(cents))}`;
+
+function statusLabel(t: TransactionDTO) {
+  if (t.type === "income") return t.isPaid ? "recebida" : "a receber";
+  return t.isPaid ? "paga" : "pendente";
+}
 
 export const TransactionsView = memo(function TransactionsView({
   data,
   month,
   onEdit,
+  onNew,
   onDelete,
   onTogglePaid,
   onImportRecurring,
@@ -29,61 +45,26 @@ export const TransactionsView = memo(function TransactionsView({
   data: FinanceData;
   month: { y: number; m: number };
   onEdit: (t: TransactionDTO) => void;
-  onDelete: (id: number) => Promise<void>;
+  onNew: () => void;
+  onDelete: (t: TransactionDTO) => void;
   onTogglePaid: (id: number, currentPaid: boolean) => Promise<void>;
-  onImportRecurring?: () => Promise<void>;
+  onImportRecurring: () => Promise<void>;
 }) {
   const key = monthKey(month.y, month.m);
+  const monthName = monthLabel(month.y, month.m).toLowerCase();
   const [query, setQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | TxnType>("all");
-  const [statusFilter, setStatusFilter] = useState<"all" | "paid" | "pending" | "recurring">("all");
+  const [statusFilter, setStatusFilter] = useState<Status>("all");
   const [catFilter, setCatFilter] = useState<string>("all");
-  const [deleting, setDeleting] = useState<number | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
   const [toggling, setToggling] = useState<number | null>(null);
   const [importing, setImporting] = useState(false);
-  const [pagination, setPagination] = useState({ key, page: 1 });
-  const pageSize = 40;
 
-  // Compute missing recurring items available to import for this month
-  const missingRecurring = useMemo(() => {
-    const userRecurring = data.transactions.filter((t) => t.isRecurring);
-    if (userRecurring.length === 0) return [];
+  const missing = useMissingRecurring(data.transactions, key);
 
-    const templatesMap = new Map<string, TransactionDTO>();
-    for (const item of userRecurring) {
-      const k = `${item.type}:${item.categoryId}:${item.description.trim().toLowerCase()}`;
-      if (!templatesMap.has(k)) {
-        templatesMap.set(k, item);
-      }
-    }
+  const monthTxns = useMemo(() => data.transactions.filter((t) => keyFromISO(t.date) === key), [data.transactions, key]);
 
-    const currentMonthKeys = new Set(
-      data.transactions
-        .filter((t) => keyFromISO(t.date) === key)
-        .map((t) => `${t.type}:${t.categoryId}:${t.description.trim().toLowerCase()}`),
-    );
-
-    const available: TransactionDTO[] = [];
-    for (const [k, tpl] of templatesMap.entries()) {
-      if (!currentMonthKeys.has(k)) {
-        available.push(tpl);
-      }
-    }
-    return available;
-  }, [data.transactions, key]);
-
-  const missingExpensesCount = missingRecurring.filter((t) => t.type === "expense").length;
-  const missingIncomeCount = missingRecurring.filter((t) => t.type === "income").length;
-
-  const monthTxns = useMemo(
-    () => data.transactions.filter((t) => keyFromISO(t.date) === key),
-    [data.transactions, key],
-  );
-
-  const pendingCount = useMemo(
-    () => monthTxns.filter((t) => t.type === "expense" && !t.isPaid).length,
-    [monthTxns],
-  );
+  const pendingCount = useMemo(() => monthTxns.filter((t) => t.type === "expense" && !t.isPaid).length, [monthTxns]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -93,18 +74,16 @@ export const TransactionsView = memo(function TransactionsView({
       if (statusFilter === "paid" && !t.isPaid) return false;
       if (statusFilter === "pending" && t.isPaid) return false;
       if (statusFilter === "recurring" && !t.isRecurring) return false;
-      if (q && !t.description.toLowerCase().includes(q) && !t.category.name.toLowerCase().includes(q))
-        return false;
+      if (q && !t.description.toLowerCase().includes(q) && !t.category.name.toLowerCase().includes(q)) return false;
       return true;
     });
   }, [monthTxns, query, typeFilter, catFilter, statusFilter]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const page = pagination.key === key ? Math.min(pagination.page, totalPages) : 1;
-  const visible = useMemo(
-    () => filtered.slice((page - 1) * pageSize, page * pageSize),
-    [filtered, page],
-  );
+  // "Mostrar mais" volta ao início sempre que o mês ou os filtros mudam
+  const signature = `${key}|${query}|${typeFilter}|${statusFilter}|${catFilter}`;
+  const [shown, setShown] = useState({ signature, count: PAGE });
+  const count = shown.signature === signature ? shown.count : PAGE;
+  const visible = useMemo(() => filtered.slice(0, count), [filtered, count]);
 
   const groups = useMemo(() => {
     const map = new Map<string, TransactionDTO[]>();
@@ -116,18 +95,41 @@ export const TransactionsView = memo(function TransactionsView({
     return [...map.entries()];
   }, [visible]);
 
-  const income = filtered.reduce((s, t) => (t.type === "income" ? s + t.amountCents : s), 0);
-  const paidIncome = filtered.reduce((s, t) => (t.type === "income" && t.isPaid ? s + t.amountCents : s), 0);
-  const pendingIncome = filtered.reduce((s, t) => (t.type === "income" && !t.isPaid ? s + t.amountCents : s), 0);
+  const totals = useMemo(() => {
+    let income = 0;
+    let paidIncome = 0;
+    let expense = 0;
+    let paidExpense = 0;
+    let pendingExpense = 0;
+    for (const t of filtered) {
+      if (t.type === "income") {
+        income += t.amountCents;
+        if (t.isPaid) paidIncome += t.amountCents;
+      } else {
+        expense += t.amountCents;
+        if (t.isPaid) paidExpense += t.amountCents;
+        else pendingExpense += t.amountCents;
+      }
+    }
+    return { income, paidIncome, expense, paidExpense, pendingExpense };
+  }, [filtered]);
 
-  const expense = filtered.reduce((s, t) => (t.type === "expense" ? s + t.amountCents : s), 0);
-  const paidExpense = filtered.reduce((s, t) => (t.type === "expense" && t.isPaid ? s + t.amountCents : s), 0);
-  const pendingExpense = filtered.reduce((s, t) => (t.type === "expense" && !t.isPaid ? s + t.amountCents : s), 0);
+  const pendingAll = useMemo(
+    () => monthTxns.reduce((s, t) => (t.type === "expense" && !t.isPaid ? s + t.amountCents : s), 0),
+    [monthTxns],
+  );
 
-  const hasFilters = query !== "" || typeFilter !== "all" || catFilter !== "all" || statusFilter !== "all";
+  const extraFilters = (typeFilter !== "all" ? 1 : 0) + (catFilter !== "all" ? 1 : 0);
+  const hasFilters = query !== "" || statusFilter !== "all" || extraFilters > 0;
+
+  const clearFilters = () => {
+    setQuery("");
+    setTypeFilter("all");
+    setStatusFilter("all");
+    setCatFilter("all");
+  };
 
   const handleImport = async () => {
-    if (!onImportRecurring) return;
     setImporting(true);
     try {
       await onImportRecurring();
@@ -136,364 +138,335 @@ export const TransactionsView = memo(function TransactionsView({
     }
   };
 
-  const remove = async (id: number) => {
-    setDeleting(id);
-    try {
-      await onDelete(id);
-    } finally {
-      setDeleting(null);
-    }
+  const toggle = async (t: TransactionDTO) => {
+    setToggling(t.id);
+    await onTogglePaid(t.id, t.isPaid);
+    setToggling(null);
   };
 
-  const handleToggle = async (e: React.MouseEvent, t: TransactionDTO) => {
-    e.stopPropagation();
-    setToggling(t.id);
-    try {
-      await onTogglePaid(t.id, t.isPaid);
-    } finally {
-      setToggling(null);
-    }
-  };
+  const net = totals.income - totals.expense;
+
+  const stats = [
+    { label: "Entradas", value: fmt(totals.income), tone: "text-accent", sub: `${fmt(totals.paidIncome)} recebidas` },
+    { label: "Saídas", value: fmt(totals.expense), tone: "text-negative", sub: `${fmt(totals.paidExpense)} pagas` },
+    {
+      label: "Saldo",
+      value: fmt(net),
+      tone: net >= 0 ? "text-accent" : "text-negative",
+      sub: `${fmt(totals.paidIncome - totals.paidExpense)} realizado`,
+    },
+  ];
 
   return (
     <div className="space-y-4">
-      {/* Banner de Importação de Fixos */}
-      {missingRecurring.length > 0 && onImportRecurring && (
-        <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-accent/30 bg-accent/[0.07] p-4.5 text-cream lg:backdrop-blur-md shadow-[0_10px_35px_-15px_rgba(182,242,68,0.2)]">
-          <div className="flex items-center gap-3">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-accent text-ink">
-              <Repeat2 size={20} strokeWidth={2.4} />
-            </span>
-            <div>
-              <p className="font-display text-[14.5px] font-semibold text-cream">
-                Lançamentos Fixos Prontos para Importar
-              </p>
-              <p className="text-[12px] text-faint">
-                {missingExpensesCount > 0 && `${missingExpensesCount} despesa${missingExpensesCount > 1 ? "s" : ""}`}
-                {missingExpensesCount > 0 && missingIncomeCount > 0 && " e "}
-                {missingIncomeCount > 0 && `${missingIncomeCount} receita${missingIncomeCount > 1 ? "s" : ""}`} disponíveis para o mês selecionado.
-              </p>
-            </div>
+      {/* importar fixos */}
+      {missing.items.length > 0 && (
+        <div className="flex items-center gap-3 rounded-[20px] border border-accent/30 bg-accent/[0.07] p-3.5 sm:p-4">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary text-ink">
+            <Repeat2 size={19} strokeWidth={2.3} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[14px] font-semibold leading-snug text-fg">Fixos prontos para importar</p>
+            <p className="mt-0.5 text-[12.5px] leading-snug text-fg-muted">
+              {describeCounts(missing.expenses, missing.incomes)} para {monthName}.
+            </p>
           </div>
-
-          <button
-            disabled={importing}
-            onClick={() => void handleImport()}
-            className="flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-xs font-bold text-ink shadow-[0_10px_25px_-5px_rgba(182,242,68,0.4)] hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50"
-          >
-            <Repeat2 size={14} className={importing ? "animate-spin" : ""} strokeWidth={2.4} />
-            {importing ? "Importando..." : "Importar Fixos do Mês"}
+          <button type="button" disabled={importing} onClick={() => void handleImport()} className="btn btn-primary shrink-0 px-3.5">
+            {importing && <LoaderCircle size={15} className="animate-spin" />}
+            {importing ? "Importando" : "Importar"}
           </button>
         </div>
       )}
 
-      {/* summary strip */}
-      <div className="card grid grid-cols-2 xs:grid-cols-3 lg:grid-cols-5 gap-3 p-4 sm:p-5 lg:gap-0 lg:divide-x lg:divide-line">
-        <div className="px-1 sm:px-2 lg:px-4">
-          <p className="eyebrow mb-1">Transações</p>
-          <p className="font-display text-[16px] sm:text-[17px] font-semibold tabular-nums text-cream">{filtered.length}</p>
-        </div>
-        <div className="px-1 sm:px-2 lg:px-4">
-          <p className="eyebrow mb-1">Entradas Total</p>
-          <p className="font-display text-[16px] sm:text-[17px] font-semibold tabular-nums text-accent">{fmt(income)}</p>
-          <p className="text-[10px] text-faint mt-0.5">{fmt(paidIncome)} recebidas</p>
-        </div>
-        <div className="px-1 sm:px-2 lg:px-4">
-          <p className="eyebrow mb-1">Despesas Total</p>
-          <p className="font-display text-[16px] sm:text-[17px] font-semibold tabular-nums text-coral">{fmt(expense)}</p>
-          <p className="text-[10px] text-faint mt-0.5">{fmt(paidExpense)} pagas</p>
-        </div>
-        <div className="px-1 sm:px-2 lg:px-4">
-          <p className="eyebrow mb-1">Pendentes a Pagar</p>
-          <p
-            className={`font-display text-[16px] sm:text-[17px] font-semibold tabular-nums ${
-              pendingExpense > 0 ? "text-amber-400" : "text-faint"
-            }`}
+      {/* resumo */}
+      <section aria-label="Resumo do mês" className="card overflow-clip">
+        <dl className="grid grid-cols-3 divide-x divide-line">
+          {stats.map((s) => (
+            <div key={s.label} className="min-w-0 px-3 py-3.5 sm:px-5 sm:py-4">
+              <dt className="eyebrow truncate tracking-[0.1em] xs:tracking-[0.16em]">{s.label}</dt>
+              <dd className={`mt-1.5 truncate font-display text-[clamp(0.9rem,4.1vw,1.25rem)] leading-none font-semibold tabular-nums ${s.tone}`}>
+                {s.value}
+              </dd>
+              <dd className="mt-1.5 hidden truncate text-[12px] text-fg-subtle sm:block">{s.sub}</dd>
+            </div>
+          ))}
+        </dl>
+        {pendingAll > 0 && (
+          <button
+            type="button"
+            onClick={() => setStatusFilter(statusFilter === "pending" ? "all" : "pending")}
+            aria-pressed={statusFilter === "pending"}
+            className="flex min-h-11 w-full items-center justify-between gap-2 border-t border-line bg-warning/[0.07] px-3.5 text-left text-[13px] transition-colors hover:bg-warning/[0.11] sm:px-5"
           >
-            {fmt(pendingExpense)}
-          </p>
-          <p className="text-[10px] text-faint mt-0.5">{pendingCount} contas</p>
-        </div>
-        <div className="col-span-2 xs:col-span-1 px-1 sm:px-2 lg:px-4">
-          <p className="eyebrow mb-1">Saldo do filtro</p>
-          <p
-            className="font-display text-[16px] sm:text-[17px] font-semibold tabular-nums"
-            style={{ color: income - expense >= 0 ? "#b6f244" : "#ff6e82" }}
-          >
-            {fmt(income - expense)}
-          </p>
-          <p className="text-[10px] text-faint mt-0.5">
-            Realizado: <span className="font-semibold">{fmt(paidIncome - paidExpense)}</span>
-          </p>
-        </div>
-      </div>
+            <span className="flex items-center gap-2 font-medium text-warning">
+              <Clock size={15} />
+              {pendingCount} {pendingCount === 1 ? "conta pendente" : "contas pendentes"}
+            </span>
+            <span className="font-display font-semibold text-warning tabular-nums">{fmt(pendingAll)}</span>
+          </button>
+        )}
+      </section>
 
-      {/* filters & tabs */}
-      <div className="card space-y-3 px-3 xs:px-4 sm:px-5 py-4">
-        {/* Quick status tabs */}
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar snap-x border-b border-line pb-3">
+      {/* filtros */}
+      <section aria-label="Filtros" className="card space-y-3 p-3 sm:p-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative min-w-0 flex-1 basis-[calc(100%-3.25rem)] sm:basis-60">
+            <Search size={16} className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-fg-subtle" />
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Buscar transações"
+              aria-label="Buscar transações"
+              enterKeyHint="search"
+              className="field pr-10 pl-10 [&::-webkit-search-cancel-button]:hidden"
+            />
+            {query && (
+              <button
+                type="button"
+                onClick={() => setQuery("")}
+                aria-label="Limpar busca"
+                className="absolute top-1/2 right-1 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-lg text-fg-subtle hover:text-fg"
+              >
+                <X size={16} />
+              </button>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowFilters((v) => !v)}
+            aria-expanded={showFilters}
+            aria-controls="filtros-extras"
+            aria-label={extraFilters ? `Mais filtros (${extraFilters} ativos)` : "Mais filtros"}
+            className={`icon-btn relative border sm:hidden ${showFilters ? "border-accent/50 bg-accent/10 text-accent" : "border-line-strong"}`}
+          >
+            <SlidersHorizontal size={18} />
+            {extraFilters > 0 && <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-accent" />}
+          </button>
+          <div id="filtros-extras" className={`${showFilters ? "flex" : "hidden"} w-full gap-2 sm:flex sm:w-auto`}>
+            <div className="relative min-w-0 flex-1 sm:w-[168px] sm:flex-none">
+              <select
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value as "all" | TxnType)}
+                aria-label="Tipo"
+                className="field"
+              >
+                <option value="all">Todos os tipos</option>
+                <option value="income">Receitas</option>
+                <option value="expense">Despesas</option>
+              </select>
+              <ChevronDown size={15} className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-fg-subtle" />
+            </div>
+            <div className="relative min-w-0 flex-1 sm:w-[220px] sm:flex-none">
+              <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)} aria-label="Categoria" className="field">
+                <option value="all">Todas as categorias</option>
+                {data.categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown size={15} className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-fg-subtle" />
+            </div>
+          </div>
+        </div>
+
+        <div role="radiogroup" aria-label="Status" className="no-scrollbar -mx-3 flex gap-1.5 overflow-x-auto px-3 sm:mx-0 sm:px-0">
           {(
             [
               { id: "all", label: "Todas" },
               { id: "pending", label: "Pendentes", count: pendingCount },
               { id: "paid", label: "Pagas" },
-              { id: "recurring", label: "Gastos Fixos" },
+              { id: "recurring", label: "Fixas" },
             ] as const
-          ).map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => {
-                setStatusFilter(tab.id);
-                setPagination({ key, page: 1 });
-              }}
-              className={`flex shrink-0 snap-start items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold min-h-[44px] transition-all ${
-                statusFilter === tab.id
-                  ? "bg-accent text-ink shadow-[0_2px_12px_rgba(182,242,68,0.3)]"
-                  : "bg-panel text-mute hover:bg-cream/6 hover:text-cream"
-              }`}
-            >
-              {tab.label}
-              {"count" in tab && tab.count && tab.count > 0 ? (
-                <span
-                  className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
-                    statusFilter === tab.id ? "bg-ink/20 text-ink" : "bg-amber-400/20 text-amber-400"
-                  }`}
-                >
-                  {tab.count}
-                </span>
-              ) : null}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2.5">
-          <div className="relative basis-[min(100%,260px)] flex-1">
-            <Search size={14} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-faint" />
-            <input
-              value={query}
-              onChange={(e) => {
-                setQuery(e.target.value);
-                setPagination({ key, page: 1 });
-              }}
-              placeholder="Buscar por descrição ou categoria..."
-              className="field !pl-9 w-full"
-            />
-          </div>
-
-          <div className="relative basis-[min(100%,160px)] flex-1 xs:flex-none">
-            <select
-              value={typeFilter}
-              onChange={(e) => {
-                setTypeFilter(e.target.value as "all" | TxnType);
-                setPagination({ key, page: 1 });
-              }}
-              className="field appearance-none !pr-9 w-full"
-            >
-              <option value="all">Tipos (Todos)</option>
-              <option value="income">Receitas</option>
-              <option value="expense">Despesas</option>
-            </select>
-            <ChevronDown size={13} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-faint" />
-          </div>
-
-          <div className="relative basis-[min(100%,190px)] flex-1 xs:flex-none">
-            <select
-              value={catFilter}
-              onChange={(e) => {
-                setCatFilter(e.target.value);
-                setPagination({ key, page: 1 });
-              }}
-              className="field appearance-none !pr-9 w-full"
-            >
-              <option value="all">Todas as categorias</option>
-              {data.categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-            <ChevronDown size={13} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-faint" />
-          </div>
-
-          {hasFilters && (
-            <button
-              onClick={() => {
-                setQuery("");
-                setTypeFilter("all");
-                setStatusFilter("all");
-                setCatFilter("all");
-                setPagination({ key, page: 1 });
-              }}
-              className="flex w-full xs:w-auto items-center justify-center gap-1.5 rounded-xl border border-line px-3.5 py-2.5 text-[12px] font-medium text-mute transition-colors hover:border-line-strong hover:text-cream min-h-[44px]"
-            >
-              <X size={13} /> Limpar
-            </button>
-          )}
-
-          <span className="ml-auto hidden items-center gap-1.5 text-[11px] text-faint sm:flex">
-            <SlidersHorizontal size={12} /> mostrando {visible.length} de {filtered.length}
-          </span>
-        </div>
-      </div>
-
-      {/* list */}
-      {groups.length === 0 ? (
-        <div className="card grid place-items-center px-4 sm:px-6 py-20 text-center">
-          <span className="grid h-12 w-12 place-items-center rounded-2xl border border-line text-faint">
-            <SearchX size={20} />
-          </span>
-          <p className="mt-4 font-display text-[15px] font-semibold text-cream">Nada por aqui</p>
-          <p className="mt-1 max-w-[28ch] text-[12.5px] text-faint">
-            Nenhuma transação encontrada com esses filtros neste mês.
-          </p>
-        </div>
-      ) : (
-        <div className="card overflow-hidden">
-          {groups.map(([date, items]) => {
-            const dayNet = items.reduce(
-              (s, t) => s + (t.type === "income" ? t.amountCents : -t.amountCents),
-              0,
-            );
+          ).map((tab) => {
+            const active = statusFilter === tab.id;
             return (
-              <div key={date}>
-                <div className="flex items-baseline justify-between border-b border-line bg-cream/[0.025] px-3 xs:px-4 sm:px-6 py-2.5">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-mute">
-                    {fullDayLabel(date)}
-                  </p>
-                  <p
-                    className="font-display text-[11.5px] font-medium tabular-nums"
-                    style={{ color: dayNet >= 0 ? "rgba(182,242,68,0.75)" : "rgba(255,110,130,0.75)" }}
+              <button
+                key={tab.id}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                onClick={() => setStatusFilter(tab.id)}
+                className={`flex min-h-10 shrink-0 items-center gap-1.5 rounded-full border px-4 text-[13px] font-semibold transition-colors ${
+                  active
+                    ? "border-transparent bg-primary text-ink"
+                    : "border-line bg-fg/[0.03] text-fg-muted hover:border-line-strong hover:text-fg"
+                }`}
+              >
+                {tab.label}
+                {"count" in tab && tab.count > 0 && (
+                  <span
+                    className={`rounded-full px-1.5 text-[11px] font-bold tabular-nums ${
+                      active ? "bg-ink/15 text-ink" : "bg-warning/15 text-warning"
+                    }`}
                   >
-                    {fmt(dayNet)}
-                  </p>
-                </div>
-                <AnimatePresence initial={false}>
-                  {items.map((t) => (
-                    <motion.div
-                      key={t.id}
-                      layout
-                      exit={{ opacity: 0, x: -24, height: 0 }}
-                      transition={{ duration: 0.25 }}
-                      className={`group flex flex-wrap sm:flex-nowrap cursor-pointer items-center gap-3 sm:gap-3.5 border-b border-line/60 px-3 xs:px-4 sm:px-6 py-3 transition-colors last:border-0 hover:bg-cream/[0.03] ${
-                        !t.isPaid && t.type === "expense" ? "bg-amber-500/[0.03]" : ""
-                      }`}
-                      onClick={() => onEdit(t)}
-                    >
-                      {/* Checkbox toggle Pago / Pendente with 44px tap target */}
-                      <div className="grid h-11 w-11 shrink-0 place-items-center -m-2">
-                        <button
-                          type="button"
-                          onClick={(e) => handleToggle(e, t)}
-                          disabled={toggling === t.id}
-                          title={t.isPaid ? "Marcado como pago. Clique para marcar pendente." : "Pendente. Clique para marcar como pago."}
-                          className={`grid h-6 w-6 place-items-center rounded-lg transition-all ${
-                            t.isPaid
-                              ? "bg-accent/15 text-accent border border-accent/30 hover:bg-accent hover:text-ink"
-                              : "border-2 border-amber-400 bg-amber-400/10 text-amber-400 hover:bg-amber-400 hover:text-ink animate-pulse"
-                          }`}
-                        >
-                          {t.isPaid ? (
-                            <Check size={13} strokeWidth={2.8} />
-                          ) : (
-                            <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
-                          )}
-                        </button>
-                      </div>
-
-                      <CategoryIcon icon={t.category.icon} color={t.category.color} chip={37} />
-
-                      <div className="min-w-0 flex-1 basis-[calc(100%-140px)] sm:basis-auto">
-                        <div className="flex items-center gap-2">
-                          <p className={`truncate text-[13.5px] font-medium ${t.isPaid ? "text-cream" : "text-amber-200"}`}>
-                            {t.description}
-                          </p>
-                          {!t.isPaid && t.type === "expense" && (
-                            <span className="inline-flex items-center gap-1 rounded-md bg-amber-400/15 px-1.5 py-0.5 text-[9.5px] font-semibold text-amber-400 shrink-0">
-                              <Clock size={10} /> pendente
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-faint">
-                          <span>{t.category.name}</span>
-                          {t.installmentTotal && (
-                            <span className="inline-flex rounded-md bg-cream/5 px-1.5 py-0.2 text-[9.5px] text-mute">
-                              parcela {t.installmentNumber}/{t.installmentTotal}
-                            </span>
-                          )}
-                          {t.isRecurring && (
-                            <span className="inline-flex items-center gap-0.8 rounded-md bg-accent/10 px-1.5 py-0.2 text-[9.5px] font-medium text-accent">
-                              <Repeat2 size={10} /> fixa
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="hover-reveal [@media(hover:hover)]:opacity-0 flex items-center gap-1 sm:opacity-0 transition-opacity group-hover:opacity-100 order-3 sm:order-none ml-auto sm:ml-0">
-                        <span
-                          role="button"
-                          aria-label="Editar"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onEdit(t);
-                          }}
-                          className="grid h-9 w-9 sm:h-7 sm:w-7 place-items-center rounded-lg text-faint transition-colors hover:bg-cream/8 hover:text-cream"
-                        >
-                          <Pencil size={13} />
-                        </span>
-                        <span
-                          role="button"
-                          aria-label="Excluir"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            void remove(t.id);
-                          }}
-                          className={`grid h-9 w-9 sm:h-7 sm:w-7 place-items-center rounded-lg text-faint transition-colors hover:bg-coral/15 hover:text-coral ${
-                            deleting === t.id ? "animate-pulse !opacity-100 text-coral" : ""
-                          }`}
-                        >
-                          <Trash2 size={13} />
-                        </span>
-                      </div>
-
-                      <div className="text-right shrink-0">
-                        <p
-                          className={`font-display text-[13.5px] font-medium tabular-nums ${
-                            t.type === "income" ? "text-accent" : t.isPaid ? "text-cream" : "text-amber-300"
-                          }`}
-                        >
-                          {fmtSigned(t.amountCents, t.type)}
-                        </p>
-                        <p className="text-[10px] text-faint">
-                          {t.isPaid ? "pago" : "a pagar"}
-                        </p>
-                      </div>
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-              </div>
+                    {tab.count}
+                  </span>
+                )}
+              </button>
             );
           })}
+          {hasFilters && (
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="ml-auto flex min-h-10 shrink-0 items-center gap-1.5 rounded-full px-3 text-[13px] font-semibold text-fg-muted transition-colors hover:bg-fg/[0.05] hover:text-fg"
+            >
+              <X size={14} /> Limpar
+            </button>
+          )}
         </div>
-      )}
-      {filtered.length > pageSize && (
-        <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-          <button
-            disabled={page === 1}
-            onClick={() => setPagination({ key, page: Math.max(1, page - 1) })}
-            className="min-h-[44px] rounded-xl border border-line px-4 py-2 text-xs text-mute hover:text-cream disabled:opacity-30"
-          >
-            Anterior
-          </button>
-          <span className="text-xs text-faint">Página {page} de {totalPages}</span>
-          <button
-            disabled={page === totalPages}
-            onClick={() => setPagination({ key, page: Math.min(totalPages, page + 1) })}
-            className="min-h-[44px] rounded-xl border border-line px-4 py-2 text-xs text-mute hover:text-cream disabled:opacity-30"
-          >
-            Próxima
-          </button>
+      </section>
+
+      {/* lista */}
+      {monthTxns.length === 0 ? (
+        <div className="card">
+          <EmptyState
+            icon={<ReceiptText size={20} />}
+            title={`Nenhuma transação em ${monthName}`}
+            description={
+              missing.items.length > 0
+                ? "Comece importando seus lançamentos fixos ou registre uma nova transação."
+                : "Registre a primeira receita ou despesa do mês."
+            }
+            action={
+              <>
+                <button type="button" onClick={onNew} className="btn btn-primary">
+                  <Plus size={15} strokeWidth={2.6} /> Nova transação
+                </button>
+                {missing.items.length > 0 && (
+                  <button type="button" onClick={() => void handleImport()} disabled={importing} className="btn btn-secondary">
+                    <Repeat2 size={15} /> Importar fixos
+                  </button>
+                )}
+              </>
+            }
+          />
         </div>
+      ) : groups.length === 0 ? (
+        <div className="card">
+          <EmptyState
+            icon={<SearchX size={20} />}
+            title="Nada encontrado"
+            description="Nenhuma transação do mês corresponde a esses filtros."
+            action={
+              <button type="button" onClick={clearFilters} className="btn btn-secondary">
+                <X size={15} /> Limpar filtros
+              </button>
+            }
+          />
+        </div>
+      ) : (
+        <>
+          <p className="px-1 text-[13px] text-fg-muted" aria-live="polite">
+            {filtered.length} {filtered.length === 1 ? "transação" : "transações"}
+            {hasFilters ? " com os filtros atuais" : ` em ${monthName}`}
+          </p>
+          <div className="card overflow-clip">
+            {groups.map(([date, items]) => {
+              const dayNet = items.reduce((s, t) => s + (t.type === "income" ? t.amountCents : -t.amountCents), 0);
+              return (
+                <section key={date} aria-label={fullDayLabel(date)}>
+                  <div className="sticky top-[calc(var(--topbar-h)+var(--safe-t))] z-10 flex items-baseline justify-between gap-3 border-b border-line bg-surface px-4 py-2 sm:px-5 lg:top-0">
+                    <h3 className="truncate text-[12px] font-semibold tracking-[0.06em] text-fg-muted uppercase">{fullDayLabel(date)}</h3>
+                    <p className={`shrink-0 font-display text-[12.5px] font-medium tabular-nums ${dayNet >= 0 ? "text-accent" : "text-negative"}`}>
+                      {signedNet(dayNet)}
+                    </p>
+                  </div>
+                  <ul>
+                    <AnimatePresence initial={false}>
+                      {items.map((t) => (
+                        <motion.li
+                          key={t.id}
+                          layout="position"
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.22 }}
+                          className={`group flex items-center gap-1.5 border-b border-line pr-2 pl-2.5 last:border-0 sm:pr-3 sm:pl-3.5 ${
+                            !t.isPaid && t.type === "expense" ? "bg-warning/[0.035]" : ""
+                          }`}
+                        >
+                          <PaidToggle
+                            paid={t.isPaid}
+                            kind={t.type}
+                            label={t.description}
+                            busy={toggling === t.id}
+                            onToggle={() => void toggle(t)}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => onEdit(t)}
+                            className="flex min-w-0 flex-1 items-center gap-3 py-3 text-left"
+                          >
+                            <CategoryIcon icon={t.category.icon} color={t.category.color} chip={38} />
+                            <span className="min-w-0 flex-1">
+                              <span className="line-clamp-2 text-[14px] leading-snug font-medium break-words text-fg">{t.description}</span>
+                              <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[12px] text-fg-subtle">
+                                <span className="truncate">{t.category.name}</span>
+                                {t.installmentTotal ? (
+                                  <span className="chip bg-fg/[0.06] text-fg-muted">
+                                    {t.installmentNumber}/{t.installmentTotal}
+                                  </span>
+                                ) : null}
+                                {t.isRecurring && (
+                                  <span className="chip bg-accent/12 text-accent">
+                                    <Repeat2 size={11} /> fixa
+                                  </span>
+                                )}
+                              </span>
+                            </span>
+                            <span className="shrink-0 text-right">
+                              <span
+                                className={`block font-display text-[14px] font-semibold whitespace-nowrap tabular-nums ${
+                                  t.type === "income" ? "text-accent" : t.isPaid ? "text-fg" : "text-warning"
+                                }`}
+                              >
+                                {fmtSigned(t.amountCents, t.type)}
+                              </span>
+                              <span className={`block text-[11.5px] ${t.isPaid ? "text-fg-subtle" : "font-medium text-warning"}`}>
+                                {statusLabel(t)}
+                              </span>
+                            </span>
+                          </button>
+                          <div className="hover-reveal hidden items-center transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 sm:flex [@media(hover:hover)]:opacity-0">
+                            <button
+                              type="button"
+                              onClick={() => onEdit(t)}
+                              aria-label={`Editar ${t.description}`}
+                              className="icon-btn h-9 w-9"
+                            >
+                              <Pencil size={15} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onDelete(t)}
+                              aria-label={`Excluir ${t.description}`}
+                              className="icon-btn h-9 w-9 hover:!bg-negative/10 hover:!text-negative"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
+                        </motion.li>
+                      ))}
+                    </AnimatePresence>
+                  </ul>
+                </section>
+              );
+            })}
+          </div>
+          {filtered.length > count && (
+            <button
+              type="button"
+              onClick={() => setShown({ signature, count: count + PAGE })}
+              className="btn btn-secondary w-full"
+            >
+              <ChevronDown size={16} /> Mostrar mais {Math.min(PAGE, filtered.length - count)}
+              <span className="font-normal text-fg-subtle">
+                ({count} de {filtered.length})
+              </span>
+            </button>
+          )}
+        </>
       )}
     </div>
   );

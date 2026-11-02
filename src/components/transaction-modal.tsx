@@ -1,11 +1,29 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
-import { Check, LoaderCircle, Repeat2, TrendingDown, TrendingUp, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  CalendarDays,
+  Check,
+  ChevronDown,
+  CircleDollarSign,
+  LoaderCircle,
+  Plus,
+  Repeat2,
+  Trash2,
+  TrendingDown,
+  TrendingUp,
+} from "lucide-react";
+import { useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 import { centsToInput, formatCurrencyInput, parseAmount, todayISO } from "@/lib/format";
 import { BareIcon } from "@/lib/icons";
 import type { CategoryDTO, TransactionDTO, TxnPayload, TxnType } from "@/lib/types";
+import { Sheet } from "./sheet";
+import { SwitchRow } from "./ui";
+
+function shiftISO(iso: string, days: number) {
+  const [y, m, d] = iso.split("-").map(Number);
+  const date = new Date(y, m - 1, d + days);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
 
 export function TransactionModal({
   open,
@@ -13,17 +31,19 @@ export function TransactionModal({
   categories,
   onClose,
   onSubmit,
+  onDelete,
+  onManageCategories,
 }: {
   open: boolean;
   editing: TransactionDTO | null;
   categories: CategoryDTO[];
   onClose: () => void;
   onSubmit: (payload: TxnPayload, id?: number) => Promise<void>;
+  onDelete?: (t: TransactionDTO) => void;
+  onManageCategories?: () => void;
 }) {
   const [type, setType] = useState<TxnType>(editing?.type ?? "expense");
-  const [amount, setAmount] = useState(
-    editing ? centsToInput(editing.amountCents) : "",
-  );
+  const [amount, setAmount] = useState(editing ? centsToInput(editing.amountCents) : "");
   const [description, setDescription] = useState(editing?.description ?? "");
   const [categoryId, setCategoryId] = useState<number | null>(editing?.categoryId ?? null);
   const [date, setDate] = useState(editing?.date ?? todayISO());
@@ -32,25 +52,12 @@ export function TransactionModal({
   const [repeat, setRepeat] = useState<"none" | "monthly">("none");
   const [installments, setInstallments] = useState(1);
   const [busy, setBusy] = useState(false);
+  const [touched, setTouched] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const amountRef = useRef<HTMLInputElement>(null);
+  const formRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const timer = setTimeout(() => amountRef.current?.focus(), 120);
-    return () => clearTimeout(timer);
-  }, [open, editing]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    document.addEventListener("keydown", onKey);
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
-    };
-  }, [open, onClose]);
+  const [today] = useState(todayISO);
+  const yesterday = useMemo(() => shiftISO(today, -1), [today]);
 
   const visibleCategories = useMemo(() => categories.filter((c) => c.type === type), [categories, type]);
 
@@ -61,17 +68,28 @@ export function TransactionModal({
   };
 
   const cents = parseAmount(amount);
-  const valid = cents !== null && cents > 0 && description.trim().length > 0 && categoryId !== null;
+  const errors = {
+    amount: !cents ? "Informe um valor maior que zero." : null,
+    description: description.trim().length === 0 ? "Dê um nome para a transação." : null,
+    category: categoryId === null ? "Escolha uma categoria." : null,
+  };
+  const valid = !errors.amount && !errors.description && !errors.category;
 
   const submit = async () => {
-    if (!valid || busy) return;
+    if (busy) return;
+    if (!valid) {
+      setTouched(true);
+      const first = errors.amount ? "amount" : errors.description ? "description" : "category";
+      formRef.current?.querySelector<HTMLElement>(`[data-field="${first}"]`)?.focus();
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
       await onSubmit(
         {
           description: description.trim(),
-          amountCents: cents,
+          amountCents: cents!,
           type,
           categoryId: categoryId!,
           date,
@@ -84,262 +102,334 @@ export function TransactionModal({
       );
       onClose();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Algo deu errado.");
+      setError(e instanceof Error ? e.message : "Algo deu errado. Tente novamente.");
       setBusy(false);
     }
   };
 
-  const accent = type === "income" ? "#b6f244" : "#ff6e82";
+  const onEnter = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      void submit();
+    }
+  };
+
+  const showError = (field: keyof typeof errors) => touched && errors[field];
+  const income = type === "income";
 
   return (
-    <AnimatePresence>
-      {open && (
-        <motion.div
-          className="fixed inset-0 z-[90] flex items-end justify-center p-0 sm:items-center sm:p-4"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-        >
-          <motion.button
-            aria-label="Fechar"
-            className="absolute inset-0 bg-ink/88 sm:bg-ink/75 sm:backdrop-blur-md"
-            onClick={onClose}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          />
-          <motion.div
-            role="dialog"
-            aria-modal
-            className="relative max-h-[92dvh] sm:max-h-[90dvh] w-full max-w-[520px] overflow-y-auto rounded-t-[26px] sm:rounded-[26px] border border-line-strong bg-panel p-5 sm:p-7 shadow-[0_40px_120px_-20px_rgba(0,0,0,0.9)] overscroll-contain pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:pb-7"
-            initial={{ opacity: 0, y: 32, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.98 }}
-            transition={{ type: "spring", stiffness: 380, damping: 32 }}
-          >
-            <div className="mb-5 sm:mb-6 flex items-start justify-between">
-              <div>
-                <p className="eyebrow mb-1.5">{editing ? "editar" : "registrar"}</p>
-                <h2 className="font-serif text-[24px] sm:text-[26px] leading-none text-cream">
-                  {editing ? "Ajustar transação" : "Nova transação"}
-                </h2>
-              </div>
-              <button
-                onClick={onClose}
-                className="grid h-10 w-10 sm:h-9 sm:w-9 place-items-center rounded-xl border border-line text-mute transition-colors hover:border-line-strong hover:text-cream"
-                aria-label="Fechar modal"
-              >
-                <X size={17} />
-              </button>
-            </div>
-
-            {/* type segmented */}
-            <div className="grid grid-cols-2 gap-2">
-              {(
-                [
-                  { id: "expense", label: "Despesa", icon: TrendingDown, color: "#ff6e82" },
-                  { id: "income", label: "Receita", icon: TrendingUp, color: "#b6f244" },
-                ] as const
-              ).map((opt) => (
-                <button
-                  key={opt.id}
-                  onClick={() => switchType(opt.id)}
-                  className="flex items-center justify-center gap-2 rounded-2xl border py-3 text-[13.5px] font-semibold min-h-[44px] transition-all duration-200"
-                  style={{
-                    borderColor: type === opt.id ? `${opt.color}66` : "rgba(238,242,228,0.08)",
-                    background: type === opt.id ? `${opt.color}14` : "transparent",
-                    color: type === opt.id ? opt.color : "#878d7c",
-                  }}
-                >
-                  <opt.icon size={15} strokeWidth={2.4} />
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-
-            {/* amount */}
-            <div className="mt-5 sm:mt-6">
-              <label className="eyebrow mb-2 block">Valor</label>
-              <div className="flex items-baseline gap-2 border-b border-line pb-3 transition-colors focus-within:border-accent/50">
-                <span className="font-display text-[15px] font-medium text-faint">R$</span>
-                <input
-                  ref={amountRef}
-                  inputMode="numeric"
-                  value={amount}
-                  onChange={(e) => setAmount(formatCurrencyInput(e.target.value))}
-                  onKeyDown={(e) => e.key === "Enter" && submit()}
-                  placeholder="0,00"
-                  className="w-full bg-transparent font-display text-[clamp(1.6rem,8vw,2.125rem)] font-semibold tracking-tight text-cream outline-none placeholder:text-cream/15"
-                />
-              </div>
-            </div>
-
-            {/* description */}
-            <div className="mt-4 sm:mt-5">
-              <label className="eyebrow mb-2 block">Descrição</label>
-              <input
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && submit()}
-                placeholder={type === "income" ? "Ex.: salário, freela, dividendos..." : "Ex.: mercado, aluguel, cinema..."}
-                className="field"
-                maxLength={120}
-              />
-            </div>
-
-            {/* category */}
-            <div className="mt-4 sm:mt-5">
-              <label className="eyebrow mb-2 block">Categoria</label>
-              <div className="grid max-h-[min(188px,32dvh)] grid-cols-3 xs:grid-cols-4 gap-1.5 overflow-y-auto pr-1">
-                {visibleCategories.map((c) => {
-                  const selected = categoryId === c.id;
-                  return (
-                    <button
-                      key={c.id}
-                      onClick={() => setCategoryId(c.id)}
-                      className="flex flex-col items-center gap-1.5 rounded-2xl border py-2.5 sm:py-3 transition-all duration-150"
-                      style={{
-                        borderColor: selected ? `${c.color}70` : "rgba(238,242,228,0.07)",
-                        background: selected ? `${c.color}12` : "transparent",
-                      }}
-                    >
-                      <span style={{ color: c.color }}>
-                        <BareIcon icon={c.icon} size={17} />
-                      </span>
-                      <span
-                        className={`max-w-full truncate px-1 text-[10.5px] font-medium ${
-                          selected ? "text-cream" : "text-mute"
-                        }`}
-                      >
-                        {c.name}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* date */}
-            <div className="mt-4 sm:mt-5">
-              <label className="eyebrow mb-2 block">Data</label>
-              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="field" />
-            </div>
-
-            {/* status and fixed expense controls */}
-            <div className="mt-4 sm:mt-5 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-              {/* Payment status toggle */}
+    <Sheet
+      open={open}
+      onClose={onClose}
+      eyebrow={editing ? "editar" : "registrar"}
+      title={editing ? "Editar transação" : "Nova transação"}
+      initialFocus={editing ? undefined : "[data-field='amount']"}
+      footer={
+        <div className="space-y-2.5">
+          {error && (
+            <p role="alert" className="rounded-xl border border-negative/25 bg-negative/10 px-3 py-2 text-[13px] text-negative">
+              {error}
+            </p>
+          )}
+          <div className="flex gap-2">
+            {editing && onDelete && (
               <button
                 type="button"
-                onClick={() => setIsPaid((v) => !v)}
-                className={`flex items-center gap-3 rounded-2xl border p-3.5 text-left min-h-[52px] transition-all ${
-                  isPaid
-                    ? "border-accent/40 bg-accent/10 text-cream"
-                    : "border-coral/40 bg-coral/10 text-cream"
-                }`}
+                onClick={() => {
+                  onClose();
+                  onDelete(editing);
+                }}
+                className="btn btn-danger min-h-12 px-3.5"
+                aria-label="Excluir transação"
               >
-                <span
-                  className={`grid h-6 w-6 shrink-0 place-items-center rounded-lg ${
-                    isPaid ? "bg-accent text-ink" : "border border-coral text-coral"
-                  }`}
-                >
-                  {isPaid ? <Check size={14} strokeWidth={3} /> : <span className="h-2 w-2 rounded-full bg-coral" />}
-                </span>
-                <div>
-                  <p className="text-[12.5px] font-semibold">{isPaid ? "Pago / Recebido" : "Pendente"}</p>
-                  <p className="text-[10px] text-faint">
-                    {isPaid ? "Lançamento liquidado" : "Aguardando pagamento"}
-                  </p>
-                </div>
+                <Trash2 size={17} />
+                <span className="hidden xs:inline">Excluir</span>
               </button>
-
-              {/* Recurring fixed expense toggle */}
-              <button
-                type="button"
-                onClick={() => setIsRecurring((v) => !v)}
-                className={`flex items-center gap-3 rounded-2xl border p-3.5 text-left min-h-[52px] transition-all ${
-                  isRecurring
-                    ? "border-accent/40 bg-accent/10 text-cream"
-                    : "border-line bg-cream/[0.02] text-mute hover:border-line-strong hover:text-cream"
-                }`}
-              >
-                <span
-                  className={`grid h-6 w-6 shrink-0 place-items-center rounded-lg ${
-                    isRecurring ? "bg-accent text-ink" : "border border-line text-faint"
-                  }`}
-                >
-                  <Repeat2 size={13} strokeWidth={2.4} />
-                </span>
-                <div>
-                  <p className="text-[12.5px] font-semibold">{isRecurring ? "Gasto Fixo Ativo" : "Gasto Fixo?"}</p>
-                  <p className="text-[10px] text-faint">
-                    {isRecurring ? "Recriar todo mês no dia" : "Repetir nos próximos meses"}
-                  </p>
-                </div>
-              </button>
-            </div>
-
-            {!editing && !isRecurring && (
-              <div className="mt-4 sm:mt-5 rounded-2xl border border-line p-3.5 sm:p-4">
-                <p className="mb-3 flex items-center gap-2 text-[12px] font-semibold text-cream">
-                  <Repeat2 size={14} className="text-accent" /> Parcelamento
-                </p>
-                <div className="grid grid-cols-1 xs:grid-cols-2 gap-3">
-                  <label>
-                    <span className="eyebrow mb-2 block">Recorrência</span>
-                    <select
-                      className="field"
-                      value={repeat}
-                      onChange={(e) => {
-                        const value = e.target.value as "none" | "monthly";
-                        setRepeat(value);
-                        if (value === "monthly") setInstallments(1);
-                      }}
-                    >
-                      <option value="none">Não repetir</option>
-                      <option value="monthly">Mensal por 12 meses</option>
-                    </select>
-                  </label>
-                  <label>
-                    <span className="eyebrow mb-2 block">Parcelas</span>
-                    <select
-                      className="field"
-                      value={installments}
-                      disabled={type !== "expense" || repeat === "monthly"}
-                      onChange={(e) => setInstallments(Number(e.target.value))}
-                    >
-                      {Array.from({ length: 24 }, (_, index) => index + 1).map((value) => (
-                        <option key={value} value={value}>{value === 1 ? "À vista" : `${value}x`}</option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-              </div>
             )}
-
-            {error && <p className="mt-4 text-[12.5px] text-coral">{error}</p>}
-
-            <div className="sticky bottom-0 bg-panel pt-3 sm:pt-0 mt-5 sm:mt-6">
+            <button type="button" onClick={() => void submit()} disabled={busy} className="btn btn-primary min-h-12 flex-1 text-[14.5px]">
+              {busy ? <LoaderCircle size={17} className="animate-spin" /> : <Check size={17} strokeWidth={2.8} />}
+              {editing ? "Salvar alterações" : income ? "Adicionar receita" : "Adicionar despesa"}
+            </button>
+          </div>
+        </div>
+      }
+    >
+      <div ref={formRef} className="space-y-5">
+        {/* tipo */}
+        <div role="radiogroup" aria-label="Tipo de transação" className="grid grid-cols-2 gap-2">
+          {(
+            [
+              { id: "expense", label: "Despesa", icon: TrendingDown, on: "border-negative/50 bg-negative/10 text-negative" },
+              { id: "income", label: "Receita", icon: TrendingUp, on: "border-accent/50 bg-accent/10 text-accent" },
+            ] as const
+          ).map((opt) => {
+            const active = type === opt.id;
+            return (
               <button
-                onClick={submit}
-                disabled={!valid || busy}
-                className="flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-[14px] font-bold text-ink transition-all duration-200 enabled:hover:brightness-110 enabled:active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-30 min-h-[48px]"
-                style={{ background: accent }}
+                key={opt.id}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                onClick={() => switchType(opt.id)}
+                className={`flex min-h-12 items-center justify-center gap-2 rounded-2xl border text-[14px] font-semibold transition-colors ${
+                  active ? opt.on : "border-line text-fg-muted hover:border-line-strong hover:text-fg"
+                }`}
               >
-                {busy ? (
-                  <LoaderCircle size={16} className="animate-spin" />
-                ) : (
-                  <Check size={16} strokeWidth={2.8} />
-                )}
-                {editing
-                  ? "Salvar alterações"
-                  : type === "income"
-                    ? "Adicionar receita"
-                    : "Adicionar despesa"}
+                <opt.icon size={16} strokeWidth={2.4} />
+                {opt.label}
               </button>
+            );
+          })}
+        </div>
+
+        {/* valor */}
+        <div>
+          <label htmlFor="txn-amount" className="eyebrow mb-1.5 block">
+            Valor
+          </label>
+          <div
+            className={`flex items-baseline gap-2 border-b-2 pb-2 transition-colors focus-within:border-accent/70 ${
+              showError("amount") ? "border-negative/70" : "border-line-strong"
+            }`}
+          >
+            <span className="font-display text-[17px] font-medium text-fg-subtle">R$</span>
+            <input
+              id="txn-amount"
+              data-field="amount"
+              inputMode="numeric"
+              autoComplete="off"
+              value={amount}
+              onChange={(e) => setAmount(formatCurrencyInput(e.target.value))}
+              onKeyDown={onEnter}
+              placeholder="0,00"
+              aria-invalid={Boolean(showError("amount"))}
+              aria-describedby={showError("amount") ? "txn-amount-error" : undefined}
+              className={`w-full min-w-0 bg-transparent font-display text-[clamp(1.9rem,9vw,2.4rem)] font-semibold tracking-tight outline-none placeholder:text-fg/20 ${
+                income ? "text-accent" : "text-fg"
+              }`}
+            />
+          </div>
+          {showError("amount") && (
+            <p id="txn-amount-error" className="mt-1.5 text-[12.5px] text-negative">
+              {errors.amount}
+            </p>
+          )}
+        </div>
+
+        {/* descrição */}
+        <div>
+          <label htmlFor="txn-description" className="eyebrow mb-1.5 block">
+            Descrição
+          </label>
+          <input
+            id="txn-description"
+            data-field="description"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            onKeyDown={onEnter}
+            placeholder={income ? "Ex.: salário, freela, reembolso" : "Ex.: mercado, aluguel, cinema"}
+            autoComplete="off"
+            enterKeyHint="done"
+            className="field"
+            maxLength={120}
+            aria-invalid={Boolean(showError("description"))}
+            aria-describedby={showError("description") ? "txn-description-error" : undefined}
+          />
+          {showError("description") && (
+            <p id="txn-description-error" className="mt-1.5 text-[12.5px] text-negative">
+              {errors.description}
+            </p>
+          )}
+        </div>
+
+        {/* categoria */}
+        <div>
+          <p id="txn-category-label" className="eyebrow mb-1.5">
+            Categoria
+          </p>
+          {visibleCategories.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-line-strong p-4 text-center">
+              <p className="text-[13px] text-fg-muted">
+                Você ainda não tem categorias de {income ? "receita" : "despesa"}.
+              </p>
+              {onManageCategories && (
+                <button type="button" onClick={onManageCategories} className="btn btn-secondary mt-3">
+                  <Plus size={15} /> Criar categoria
+                </button>
+              )}
             </div>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+          ) : (
+            <div
+              role="radiogroup"
+              aria-labelledby="txn-category-label"
+              aria-describedby={showError("category") ? "txn-category-error" : undefined}
+              className="grid max-h-[min(212px,34dvh)] grid-cols-3 gap-1.5 overflow-y-auto overscroll-contain p-0.5 xs:grid-cols-4"
+            >
+              {visibleCategories.map((c, index) => {
+                const selected = categoryId === c.id;
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    data-field={index === 0 ? "category" : undefined}
+                    onClick={() => setCategoryId(c.id)}
+                    className={`flex min-h-[70px] flex-col items-center justify-center gap-1.5 rounded-2xl border px-1 py-2.5 transition-colors ${
+                      selected ? "" : "border-line hover:border-line-strong"
+                    }`}
+                    style={
+                      selected
+                        ? ({
+                            "--cat": c.color,
+                            borderColor: `color-mix(in srgb, ${c.color} 60%, transparent)`,
+                            background: `color-mix(in srgb, ${c.color} 12%, transparent)`,
+                          } as CSSProperties)
+                        : ({ "--cat": c.color } as CSSProperties)
+                    }
+                  >
+                    <span className="cat-fg">
+                      <BareIcon icon={c.icon} size={18} />
+                    </span>
+                    <span
+                      className={`line-clamp-2 max-w-full px-0.5 text-center text-[11.5px] leading-tight font-medium break-words ${
+                        selected ? "text-fg" : "text-fg-muted"
+                      }`}
+                    >
+                      {c.name}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {showError("category") && visibleCategories.length > 0 && (
+            <p id="txn-category-error" className="mt-1.5 text-[12.5px] text-negative">
+              {errors.category}
+            </p>
+          )}
+        </div>
+
+        {/* data */}
+        <div>
+          <label htmlFor="txn-date" className="eyebrow mb-1.5 block">
+            Data
+          </label>
+          <div className="flex gap-1.5">
+            {[
+              { label: "Hoje", value: today },
+              { label: "Ontem", value: yesterday },
+            ].map((chip) => (
+              <button
+                key={chip.label}
+                type="button"
+                aria-pressed={date === chip.value}
+                onClick={() => setDate(chip.value)}
+                className={`min-h-11 shrink-0 rounded-[14px] border px-3.5 text-[13px] font-semibold transition-colors ${
+                  date === chip.value
+                    ? "border-accent/50 bg-accent/10 text-accent"
+                    : "border-line-strong text-fg-muted hover:text-fg"
+                }`}
+              >
+                {chip.label}
+              </button>
+            ))}
+            <div className="relative min-w-0 flex-1">
+              <input
+                id="txn-date"
+                type="date"
+                required
+                value={date}
+                onChange={(e) => e.target.value && setDate(e.target.value)}
+                className="field min-w-0 pl-10"
+              />
+              <CalendarDays size={16} className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-fg-subtle" />
+            </div>
+          </div>
+        </div>
+
+        {/* status */}
+        <div className="space-y-2">
+          <SwitchRow
+            checked={isPaid}
+            onChange={setIsPaid}
+            icon={<CircleDollarSign size={18} />}
+            title={income ? "Recebido" : "Pago"}
+            description={
+              isPaid
+                ? income
+                  ? "O dinheiro já entrou na conta."
+                  : "O dinheiro já saiu da conta."
+                : "Fica como pendente até você marcar."
+            }
+          />
+          <SwitchRow
+            checked={isRecurring}
+            onChange={setIsRecurring}
+            icon={<Repeat2 size={18} />}
+            title="Lançamento fixo"
+            description="Fica disponível para importar nos próximos meses."
+          />
+        </div>
+
+        {!editing && !isRecurring && (
+          <details className="group rounded-2xl border border-line">
+            <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-3.5 text-[14px] font-medium text-fg [&::-webkit-details-marker]:hidden">
+              <span className="flex items-center gap-2.5">
+                <Repeat2 size={16} className="text-accent" />
+                Repetir ou parcelar
+                {(repeat !== "none" || installments > 1) && (
+                  <span className="chip bg-accent/12 text-accent">
+                    {repeat === "monthly" ? "12 meses" : `${installments}x`}
+                  </span>
+                )}
+              </span>
+              <ChevronDown size={17} className="text-fg-subtle transition-transform group-open:rotate-180" />
+            </summary>
+            <div className="grid grid-cols-1 gap-3 border-t border-line p-3.5 xs:grid-cols-2">
+              <label className="block">
+                <span className="eyebrow mb-1.5 block">Repetição</span>
+                <span className="relative block">
+                  <select
+                    className="field"
+                    value={repeat}
+                    onChange={(e) => {
+                      const value = e.target.value as "none" | "monthly";
+                      setRepeat(value);
+                      if (value === "monthly") setInstallments(1);
+                    }}
+                  >
+                    <option value="none">Não repetir</option>
+                    <option value="monthly">Todo mês por 12 meses</option>
+                  </select>
+                  <ChevronDown size={15} className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-fg-subtle" />
+                </span>
+              </label>
+              <label className="block">
+                <span className="eyebrow mb-1.5 block">Parcelas</span>
+                <span className="relative block">
+                  <select
+                    className="field"
+                    value={installments}
+                    disabled={type !== "expense" || repeat === "monthly"}
+                    onChange={(e) => setInstallments(Number(e.target.value))}
+                  >
+                    {Array.from({ length: 24 }, (_, index) => index + 1).map((value) => (
+                      <option key={value} value={value}>
+                        {value === 1 ? "À vista" : `${value}x`}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown size={15} className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-fg-subtle" />
+                </span>
+              </label>
+              {type !== "expense" && (
+                <p className="text-[12px] text-fg-subtle xs:col-span-2">Parcelamento disponível apenas para despesas.</p>
+              )}
+            </div>
+          </details>
+        )}
+      </div>
+    </Sheet>
   );
 }

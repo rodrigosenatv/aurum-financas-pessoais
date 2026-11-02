@@ -1,9 +1,22 @@
 "use client";
 
 import { motion, useSpring, useTransform } from "framer-motion";
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useId, useMemo, useRef, useState } from "react";
 import { fmt, fmtAxis } from "@/lib/format";
 import { useLightMotion } from "@/lib/motion";
+
+/* Cores dos gráficos vêm dos tokens CSS (globals.css), então acompanham o tema
+   sem re-render. Atributos SVG aceitam var() nos navegadores atuais. */
+const C = {
+  income: "var(--accent)",
+  expense: "var(--negative)",
+  grid: "var(--chart-grid)",
+  axis: "var(--chart-axis)",
+  base: "var(--line-strong)",
+  track: "var(--track)",
+  surface: "var(--surface)",
+  fg: "var(--fg)",
+} as const;
 
 /* ------------------------------------------------------------------------ */
 /* hooks                                                                     */
@@ -52,7 +65,15 @@ export const Money = memo(function Money({
     spring.set(cents);
   }, [cents, spring]);
   const text = useTransform(spring, (v) => fmt(Math.round(v), withCents));
-  return <motion.span className={`num-anim ${className ?? ""}`}>{text}</motion.span>;
+  return (
+    <>
+      {/* leitores de tela recebem o valor final, não cada quadro da contagem */}
+      <span className="sr-only">{fmt(cents, withCents)}</span>
+      <motion.span aria-hidden className={`num-anim ${className ?? ""}`}>
+        {text}
+      </motion.span>
+    </>
+  );
 });
 
 export const Percent = memo(function Percent({ value, className }: { value: number; className?: string }) {
@@ -62,7 +83,14 @@ export const Percent = memo(function Percent({ value, className }: { value: numb
     spring.set(value);
   }, [value, spring]);
   const text = useTransform(spring, (v) => `${Math.round(v)}%`);
-  return <motion.span className={`num-anim ${className ?? ""}`}>{text}</motion.span>;
+  return (
+    <>
+      <span className="sr-only">{`${Math.round(value)}%`}</span>
+      <motion.span aria-hidden className={`num-anim ${className ?? ""}`}>
+        {text}
+      </motion.span>
+    </>
+  );
 });
 
 /* ------------------------------------------------------------------------ */
@@ -104,23 +132,32 @@ export interface FlowPoint {
 
 const EASE = [0.65, 0, 0.35, 1] as const;
 
+/**
+ * Gráfico de área receitas × despesas. Com `fill`, ocupa a altura disponível
+ * do card (respeitando um mínimo); sem ele, a altura acompanha a largura.
+ */
 export const FlowChart = memo(function FlowChart({
   data,
   height = 300,
   seriesKey,
+  fill = false,
 }: {
   data: FlowPoint[];
   height?: number;
   seriesKey: string;
+  fill?: boolean;
 }) {
-  const [ref, { width }] = useMeasure();
+  const [ref, size] = useMeasure();
   const [hover, setHover] = useState<number | null>(null);
   const light = useLightMotion();
+  const uid = useId().replace(/:/g, "");
 
+  const width = size.width;
   const w = Math.max(width, 10);
-  const h = w < 420 ? 200 : w < 768 ? 240 : height;
+  const auto = w < 420 ? 210 : w < 768 ? 240 : height;
+  const h = fill ? Math.max(size.height, 200) : auto;
   const pad = {
-    l: w < 420 ? 32 : 46,
+    l: w < 420 ? 34 : 46,
     r: 14,
     t: 20,
     b: 30,
@@ -128,11 +165,9 @@ export const FlowChart = memo(function FlowChart({
   const innerW = w - pad.l - pad.r;
   const innerH = h - pad.t - pad.b;
 
-  const max =
-    Math.max(...data.map((d) => Math.max(d.income, d.expense)), 100) * 1.18;
+  const max = Math.max(...data.map((d) => Math.max(d.income, d.expense)), 100) * 1.18;
 
-  const x = (i: number) =>
-    pad.l + (data.length > 1 ? (i / (data.length - 1)) * innerW : innerW / 2);
+  const x = (i: number) => pad.l + (data.length > 1 ? (i / (data.length - 1)) * innerW : innerW / 2);
   const y = (v: number) => pad.t + innerH - (v / max) * innerH;
 
   const incomePts = data.map((d, i) => ({ x: x(i), y: y(d.income) }));
@@ -146,79 +181,78 @@ export const FlowChart = memo(function FlowChart({
 
   const grid = [1, 0.75, 0.5, 0.25].map((f) => max * f);
 
+  const indexAt = (clientX: number, svg: SVGSVGElement) => {
+    const rect = svg.getBoundingClientRect();
+    const t = (clientX - rect.left - pad.l) / innerW;
+    return Math.max(0, Math.min(data.length - 1, Math.round(t * (data.length - 1))));
+  };
+
   const onMove = (e: React.MouseEvent<SVGRectElement>) => {
     if (data.length === 0 || innerW <= 0) return;
-    const rect = (e.currentTarget.ownerSVGElement as SVGSVGElement).getBoundingClientRect();
-    const mx = e.clientX - rect.left;
-    const t = (mx - pad.l) / innerW;
-    const i = Math.round(t * (data.length - 1));
-    setHover(Math.max(0, Math.min(data.length - 1, i)));
+    setHover(indexAt(e.clientX, e.currentTarget.ownerSVGElement as SVGSVGElement));
   };
 
   const onTouch = (e: React.TouchEvent<SVGRectElement>) => {
     if (data.length === 0 || innerW <= 0 || !e.touches[0]) return;
-    const rect = (e.currentTarget.ownerSVGElement as SVGSVGElement).getBoundingClientRect();
-    const mx = e.touches[0].clientX - rect.left;
-    const t = (mx - pad.l) / innerW;
-    const i = Math.round(t * (data.length - 1));
-    setHover(Math.max(0, Math.min(data.length - 1, i)));
+    setHover(indexAt(e.touches[0].clientX, e.currentTarget.ownerSVGElement as SVGSVGElement));
   };
 
   const hovered = hover !== null ? data[hover] : null;
 
-  // Tooltip geometry with clamping
-  const tooltipWidth = Math.min(160, Math.max(130, w * 0.5));
+  const tooltipWidth = Math.min(168, Math.max(136, w * 0.5));
   let tooltipLeft = 0;
   if (hover !== null) {
     const rawLeft = x(hover) > w * 0.6 ? x(hover) - tooltipWidth - 14 : x(hover) + 14;
     tooltipLeft = Math.max(8, Math.min(w - tooltipWidth - 8, rawLeft));
   }
 
+  const gIncome = `${uid}-in`;
+  const gExpense = `${uid}-ex`;
+
+  const total = data.reduce((s, d) => s + d.income - d.expense, 0);
+
   return (
-    <div ref={ref} className="relative w-full" style={{ height: h }}>
+    <div
+      ref={ref}
+      role="img"
+      aria-label={`Receitas e despesas dos últimos ${data.length} meses. Saldo acumulado no período: ${fmt(total)}.`}
+      className={fill ? "relative min-h-[210px] w-full flex-1 sm:min-h-[250px]" : "relative w-full"}
+      style={fill ? undefined : { height: h }}
+    >
       {width > 40 && (
-        <svg width={w} height={h} className="block overflow-visible">
+        <svg width={w} height={h} className={`block overflow-visible ${fill ? "absolute inset-0" : ""}`}>
           <defs>
-            <linearGradient id="gIncome" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#b6f244" stopOpacity="0.28" />
-              <stop offset="100%" stopColor="#b6f244" stopOpacity="0" />
+            <linearGradient id={gIncome} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={C.income} stopOpacity="0.26" />
+              <stop offset="100%" stopColor={C.income} stopOpacity="0" />
             </linearGradient>
-            <linearGradient id="gExpense" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#ff6e82" stopOpacity="0.2" />
-              <stop offset="100%" stopColor="#ff6e82" stopOpacity="0" />
+            <linearGradient id={gExpense} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={C.expense} stopOpacity="0.18" />
+              <stop offset="100%" stopColor={C.expense} stopOpacity="0" />
             </linearGradient>
           </defs>
 
-          {/* grid */}
           {grid.map((v) => (
             <g key={v}>
-              <line
-                x1={pad.l}
-                x2={w - pad.r}
-                y1={y(v)}
-                y2={y(v)}
-                stroke="rgba(238,242,228,0.06)"
-                strokeDasharray="3 5"
-              />
+              <line x1={pad.l} x2={w - pad.r} y1={y(v)} y2={y(v)} stroke={C.grid} strokeDasharray="3 5" />
               <text
                 x={pad.l - (w < 420 ? 6 : 10)}
                 y={y(v) + 3}
                 textAnchor="end"
-                fontSize={w < 420 ? "9" : "10"}
-                fill="rgba(135,141,124,0.75)"
+                fontSize={w < 420 ? "10" : "10.5"}
+                fill={C.axis}
                 fontFamily="var(--font-grotesk)"
               >
                 {fmtAxis(v)}
               </text>
             </g>
           ))}
-          <line x1={pad.l} x2={w - pad.r} y1={base} y2={base} stroke="rgba(238,242,228,0.1)" />
+          <line x1={pad.l} x2={w - pad.r} y1={base} y2={base} stroke={C.base} />
 
-          {/* areas */}
           <motion.path
             key={`a-e-${seriesKey}`}
             d={expenseArea}
-            fill="url(#gExpense)"
+            fill={`url(#${gExpense})`}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: light ? 0.45 : 1, delay: light ? 0.22 : 0.5 }}
@@ -226,18 +260,17 @@ export const FlowChart = memo(function FlowChart({
           <motion.path
             key={`a-i-${seriesKey}`}
             d={incomeArea}
-            fill="url(#gIncome)"
+            fill={`url(#${gIncome})`}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: light ? 0.45 : 1, delay: light ? 0.16 : 0.35 }}
           />
 
-          {/* lines */}
           <motion.path
             key={`l-e-${seriesKey}`}
             d={expenseLine}
             fill="none"
-            stroke="#ff6e82"
+            stroke={C.expense}
             strokeWidth={2}
             strokeLinecap="round"
             initial={{ pathLength: 0 }}
@@ -248,7 +281,7 @@ export const FlowChart = memo(function FlowChart({
             key={`l-i-${seriesKey}`}
             d={incomeLine}
             fill="none"
-            stroke="#b6f244"
+            stroke={C.income}
             strokeWidth={2.4}
             strokeLinecap="round"
             initial={{ pathLength: 0 }}
@@ -256,38 +289,28 @@ export const FlowChart = memo(function FlowChart({
             transition={{ duration: light ? 0.6 : 1.3, ease: EASE, delay: light ? 0.06 : 0.12 }}
           />
 
-          {/* hover guides */}
           {hover !== null && (
             <g>
-              <line
-                x1={x(hover)}
-                x2={x(hover)}
-                y1={pad.t - 6}
-                y2={base}
-                stroke="rgba(238,242,228,0.18)"
-                strokeDasharray="2 4"
-              />
-              <circle cx={x(hover)} cy={y(data[hover].income)} r={5} fill="#0b0d0a" stroke="#b6f244" strokeWidth={2.4} />
-              <circle cx={x(hover)} cy={y(data[hover].expense)} r={5} fill="#0b0d0a" stroke="#ff6e82" strokeWidth={2.4} />
+              <line x1={x(hover)} x2={x(hover)} y1={pad.t - 6} y2={base} stroke={C.base} strokeDasharray="2 4" />
+              <circle cx={x(hover)} cy={y(data[hover].income)} r={5} fill={C.surface} stroke={C.income} strokeWidth={2.4} />
+              <circle cx={x(hover)} cy={y(data[hover].expense)} r={5} fill={C.surface} stroke={C.expense} strokeWidth={2.4} />
             </g>
           )}
 
-          {/* x labels */}
           {data.map((d, i) => {
-            // If screen is very narrow and many points, show alternate points unless hovered
-            const skip = w < 340 && data.length > 4 && i % 2 !== 0 && hover !== i;
+            const skip = w < 250 && data.length > 4 && i % 2 !== 0 && hover !== i;
             if (skip) return null;
-
             return (
               <text
                 key={d.label + i}
                 x={x(i)}
                 y={h - 8}
                 textAnchor="middle"
-                fontSize={w < 380 ? "9" : "10.5"}
-                fill={hover === i ? "#eef2e4" : "rgba(135,141,124,0.85)"}
+                fontSize={w < 380 ? "10" : "11"}
+                fontWeight={hover === i ? 600 : 400}
+                fill={hover === i ? C.fg : C.axis}
                 fontFamily="var(--font-grotesk)"
-                style={{ textTransform: "capitalize", transition: "fill .2s" }}
+                style={{ textTransform: "capitalize" }}
               >
                 {d.label}
               </text>
@@ -297,8 +320,8 @@ export const FlowChart = memo(function FlowChart({
           <rect
             x={pad.l}
             y={pad.t - 10}
-            width={innerW}
-            height={innerH + 12}
+            width={Math.max(0, innerW)}
+            height={Math.max(0, innerH + 12)}
             fill="transparent"
             onMouseMove={onMove}
             onMouseLeave={() => setHover(null)}
@@ -309,37 +332,35 @@ export const FlowChart = memo(function FlowChart({
         </svg>
       )}
 
-      {/* tooltip */}
       {hovered && hover !== null && (
         <div
-          className="pointer-events-none absolute z-10 -translate-y-1/2 rounded-xl border border-line-strong bg-[#0d100b]/95 px-3 py-2 sm:px-3.5 sm:py-2.5 shadow-2xl lg:backdrop-blur-md"
+          className="pointer-events-none absolute z-10 -translate-y-1/2 rounded-xl border border-line-strong bg-surface/95 px-3 py-2 shadow-pop sm:px-3.5 sm:py-2.5 lg:backdrop-blur-md"
           style={{
             top: Math.max(54, y(Math.max(hovered.income, hovered.expense))),
             left: tooltipLeft,
             width: tooltipWidth,
           }}
         >
-          <p className="mb-1 font-display text-[11px] font-semibold tracking-wide text-cream capitalize">
-            {hovered.label}
-          </p>
-          <div className="space-y-1 text-[10.5px] sm:text-[11px]">
+          <p className="mb-1 font-display text-[12px] font-semibold tracking-wide text-fg capitalize">{hovered.label}</p>
+          <div className="space-y-1 text-[11.5px]">
             <p className="flex items-center justify-between gap-2 sm:gap-3">
-              <span className="flex items-center gap-1.5 text-mute">
+              <span className="flex items-center gap-1.5 text-fg-muted">
                 <i className="h-1.5 w-1.5 rounded-full bg-accent" /> Receitas
               </span>
-              <span className="font-display font-medium text-cream">{fmt(hovered.income)}</span>
+              <span className="font-display font-medium text-fg">{fmt(hovered.income)}</span>
             </p>
             <p className="flex items-center justify-between gap-2 sm:gap-3">
-              <span className="flex items-center gap-1.5 text-mute">
-                <i className="h-1.5 w-1.5 rounded-full bg-coral" /> Despesas
+              <span className="flex items-center gap-1.5 text-fg-muted">
+                <i className="h-1.5 w-1.5 rounded-full bg-negative" /> Despesas
               </span>
-              <span className="font-display font-medium text-cream">{fmt(hovered.expense)}</span>
+              <span className="font-display font-medium text-fg">{fmt(hovered.expense)}</span>
             </p>
-            <p className="mt-1 flex items-center justify-between gap-2 sm:gap-3 border-t border-line pt-1">
-              <span className="text-mute">Balanço</span>
+            <p className="mt-1 flex items-center justify-between gap-2 border-t border-line pt-1 sm:gap-3">
+              <span className="text-fg-muted">Balanço</span>
               <span
-                className="font-display font-semibold"
-                style={{ color: hovered.income - hovered.expense >= 0 ? "#b6f244" : "#ff6e82" }}
+                className={`font-display font-semibold ${
+                  hovered.income - hovered.expense >= 0 ? "text-accent" : "text-negative"
+                }`}
               >
                 {fmt(hovered.income - hovered.expense)}
               </span>
@@ -377,27 +398,24 @@ export const Donut = memo(function Donut({
 }) {
   const stroke = 24;
   const r = 80;
-  const C = 2 * Math.PI * r;
+  const circumference = 2 * Math.PI * r;
   const gapAngle = slices.length > 1 ? 3 : 0;
 
   const activeSlice = slices.find((s) => s.id === active) ?? null;
 
   return (
-    <div
-      className="relative grid shrink-0 place-items-center w-full aspect-square"
-      style={{ maxWidth: size, maxHeight: size }}
-    >
-      <svg width="100%" height="100%" viewBox="0 0 200 200" className="-rotate-90">
-        <circle cx={100} cy={100} r={r} fill="none" stroke="rgba(238,242,228,0.055)" strokeWidth={stroke} />
+    <div className="relative grid aspect-square w-full shrink-0 place-items-center" style={{ maxWidth: size, maxHeight: size }}>
+      <svg width="100%" height="100%" viewBox="0 0 200 200" className="-rotate-90" aria-hidden>
+        <circle cx={100} cy={100} r={r} fill="none" stroke={C.track} strokeWidth={stroke} />
         {slices.map((s, index) => {
           const frac = total > 0 ? s.value / total : 0;
           const angle = frac * 360;
-          const len = (Math.max(0, angle - gapAngle) / 360) * C;
-          const dash = `${len} ${C - len}`;
+          const len = (Math.max(0, angle - gapAngle) / 360) * circumference;
+          const dash = `${len} ${circumference - len}`;
           const acc = slices
             .slice(0, index)
             .reduce((sum, previous) => sum + (total > 0 ? previous.value / total : 0) * 360, 0);
-          const offset = (acc / 360) * C;
+          const offset = (acc / 360) * circumference;
           const isActive = active === s.id;
           return (
             <motion.circle
@@ -415,7 +433,7 @@ export const Donut = memo(function Donut({
               // o atributo a cada frame, uma vez por fatia do donut.
               initial={{ opacity: 0, strokeWidth: stroke }}
               animate={{
-                opacity: active && !isActive ? 0.28 : 1,
+                opacity: active && !isActive ? 0.25 : 1,
                 strokeWidth: isActive ? 31 : stroke,
               }}
               transition={{ duration: 0.35, ease: "easeOut" }}
@@ -428,15 +446,13 @@ export const Donut = memo(function Donut({
         })}
       </svg>
       <div className="pointer-events-none absolute inset-0 grid place-items-center text-center">
-        <div className="px-2">
-          <p className="eyebrow mb-1">{activeSlice ? activeSlice.label : "despesas"}</p>
-          <p className="font-display text-[clamp(1.05rem,4.6vw,1.625rem)] font-semibold leading-none tracking-tight text-cream">
+        <div className="max-w-[70%] px-2">
+          <p className="eyebrow mb-1 truncate">{activeSlice ? activeSlice.label : "despesas"}</p>
+          <p className="font-display text-[clamp(1.05rem,4.6vw,1.625rem)] font-semibold leading-none tracking-tight text-fg">
             {fmt(activeSlice ? activeSlice.value : total)}
           </p>
-          <p className="mt-1.5 text-[11px] text-faint">
-            {activeSlice && total > 0
-              ? `${Math.round((activeSlice.value / total) * 100)}% do mês`
-              : "no mês"}
+          <p className="mt-1.5 text-[11.5px] text-fg-subtle">
+            {activeSlice && total > 0 ? `${Math.round((activeSlice.value / total) * 100)}% do mês` : "no mês"}
           </p>
         </div>
       </div>
@@ -452,7 +468,7 @@ export const ProgressRing = memo(function ProgressRing({
   value,
   size = 76,
   stroke = 7,
-  color = "#b6f244",
+  color = C.income,
   delay = 0,
 }: {
   value: number; // 0..1
@@ -464,17 +480,10 @@ export const ProgressRing = memo(function ProgressRing({
   const light = useLightMotion();
   const clamped = Math.max(0, Math.min(1, value));
   const r = (size - stroke) / 2;
-  const C = 2 * Math.PI * r;
+  const circumference = 2 * Math.PI * r;
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
-      <circle
-        cx={size / 2}
-        cy={size / 2}
-        r={r}
-        fill="none"
-        stroke="rgba(238,242,228,0.08)"
-        strokeWidth={stroke}
-      />
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90" aria-hidden>
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={C.track} strokeWidth={stroke} />
       <motion.circle
         cx={size / 2}
         cy={size / 2}
@@ -483,9 +492,9 @@ export const ProgressRing = memo(function ProgressRing({
         stroke={color}
         strokeWidth={stroke}
         strokeLinecap="round"
-        strokeDasharray={C}
-        initial={{ strokeDashoffset: C }}
-        animate={{ strokeDashoffset: C * (1 - clamped) }}
+        strokeDasharray={circumference}
+        initial={{ strokeDashoffset: circumference }}
+        animate={{ strokeDashoffset: circumference * (1 - clamped) }}
         transition={{ duration: light ? 0.55 : 1.1, ease: EASE, delay }}
       />
     </svg>
@@ -498,7 +507,7 @@ export const ProgressRing = memo(function ProgressRing({
 
 export const Sparkline = memo(function Sparkline({
   values,
-  color = "#b6f244",
+  color = C.income,
   height = 44,
 }: {
   values: number[];
@@ -507,6 +516,7 @@ export const Sparkline = memo(function Sparkline({
 }) {
   const [ref, { width }] = useMeasure();
   const light = useLightMotion();
+  const gradient = `${useId().replace(/:/g, "")}-spark`;
   const path = useMemo(() => {
     if (values.length < 2 || width < 20) return { line: "", area: "" };
     const max = Math.max(...values);
@@ -521,16 +531,22 @@ export const Sparkline = memo(function Sparkline({
   }, [values, width, height]);
 
   return (
-    <div ref={ref} className="w-full" style={{ height }}>
+    <div ref={ref} className="w-full" style={{ height }} aria-hidden>
       {width > 20 && (
         <svg width={width} height={height} className="block">
           <defs>
-            <linearGradient id="gSpark" x1="0" y1="0" x2="0" y2="1">
+            <linearGradient id={gradient} x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor={color} stopOpacity="0.25" />
               <stop offset="100%" stopColor={color} stopOpacity="0" />
             </linearGradient>
           </defs>
-          <motion.path d={path.area} fill="url(#gSpark)" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: light ? 0.4 : 0.9, delay: light ? 0.2 : 0.5 }} />
+          <motion.path
+            d={path.area}
+            fill={`url(#${gradient})`}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: light ? 0.4 : 0.9, delay: light ? 0.2 : 0.5 }}
+          />
           <motion.path
             d={path.line}
             fill="none"

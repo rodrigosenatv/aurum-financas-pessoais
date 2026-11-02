@@ -73,9 +73,20 @@ async function getPageState() {
   }
 }
 
-export default async function Page() {
-  const state = await getPageState();
-  if (state.kind === "ready") return <FinanceApp initialData={state.data} user={state.user} />;
+const VIEWS = ["overview", "transactions", "manage"] as const;
+type InitialView = (typeof VIEWS)[number];
+
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+export default async function Page({ searchParams }: { searchParams: SearchParams }) {
+  const [state, params] = await Promise.all([getPageState(), searchParams]);
+  if (state.kind === "ready") {
+    // deep links dos atalhos do PWA: /?tab=transactions, /?action=new
+    const tab = typeof params.tab === "string" ? params.tab : undefined;
+    const initialView = VIEWS.includes(tab as InitialView) ? (tab as InitialView) : "overview";
+    const openNew = params.action === "new";
+    return <FinanceApp initialData={state.data} user={state.user} initialView={initialView} openNew={openNew} />;
+  }
   if (state.kind === "error")
     return <AuthScreen databaseError="O banco de dados está indisponível. Confira DATABASE_URL, execute npm run db:push e tente novamente." />;
   return <AuthScreen />;

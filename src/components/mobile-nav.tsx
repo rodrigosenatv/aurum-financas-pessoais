@@ -1,10 +1,11 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowLeftRight,
   ChartPie,
   ChartSpline,
+  ChevronLeft,
+  ChevronRight,
   Download,
   LayoutDashboard,
   ListChecks,
@@ -13,139 +14,243 @@ import {
   Plus,
   Settings2,
   Target,
-  X,
 } from "lucide-react";
-import { memo, useEffect, useState } from "react";
-import { fmt, fullMonthLabel } from "@/lib/format";
+import { memo, type ReactNode } from "react";
+import { fmt, fullMonthLabel, shiftMonth, shortMonthLabel } from "@/lib/format";
 import type { UserDTO } from "@/lib/types";
-import { AurumLogo } from "./logo";
+import { Sheet } from "./sheet";
+import { ThemeSegmented } from "./theme-toggle";
 
 export type View = "overview" | "transactions" | "manage";
 
-interface NavItem {
-  id: View;
-  label: string;
-  icon: typeof LayoutDashboard;
+export interface MonthValue {
+  y: number;
+  m: number;
 }
 
-const NAV_ITEMS: NavItem[] = [
-  { id: "overview", label: "Visão geral", icon: LayoutDashboard },
-  { id: "transactions", label: "Transações", icon: ArrowLeftRight },
-  { id: "manage", label: "Cadastros", icon: Settings2 },
-];
-
-const SECTIONS = [
+export const SECTIONS = [
   { id: "fluxo", label: "Fluxo de caixa", icon: ChartSpline },
   { id: "categorias", label: "Categorias", icon: ChartPie },
   { id: "orcamentos", label: "Orçamentos", icon: ListChecks },
   { id: "metas", label: "Metas", icon: Target },
-];
+] as const;
 
 /* -------------------------------------------------------------------------- */
-/* Bottom Navigation Bar + Floating Action Button (Mobile)                   */
+/* Seletor de mês                                                              */
 /* -------------------------------------------------------------------------- */
 
-export const BottomNav = memo(function BottomNav({
-  view,
-  onSelectView,
-  onOpenNew,
+export const MonthSwitcher = memo(function MonthSwitcher({
+  month,
+  onChange,
+  compact = false,
 }: {
-  view: View;
-  onSelectView: (v: View) => void;
-  onOpenNew: () => void;
+  month: MonthValue;
+  onChange: (next: MonthValue) => void;
+  compact?: boolean;
 }) {
   return (
-    <>
-      {/* Floating Action Button (FAB) */}
-      <div className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] right-4 z-40 lg:hidden">
-        <button
-          onClick={onOpenNew}
-          onTouchStart={() => void import("./transaction-modal")}
-          aria-label="Nova transação"
-          className="grid h-14 w-14 place-items-center rounded-2xl bg-accent text-ink shadow-[0_12px_40px_-6px_rgba(182,242,68,0.6)] transition-transform active:scale-95"
-        >
-          <Plus size={24} strokeWidth={2.6} />
-        </button>
-      </div>
-
-      {/* Bottom Nav Bar */}
-      <nav
-        aria-label="Navegação móvel"
-        className="fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around border-t border-line bg-ink/97 pb-[env(safe-area-inset-bottom)] lg:hidden"
+    <div role="group" aria-label="Mês exibido" className="flex shrink-0 items-center rounded-2xl border border-line bg-surface p-0.5">
+      <button
+        type="button"
+        aria-label="Mês anterior"
+        onClick={() => onChange(shiftMonth(month.y, month.m, -1))}
+        className="grid h-10 w-10 place-items-center rounded-[14px] text-fg-muted transition-colors hover:bg-fg/[0.06] hover:text-fg"
       >
-        {NAV_ITEMS.map((item) => {
-          const active = view === item.id;
-          const Icon = item.icon;
-          return (
-            <button
-              key={item.id}
-              onClick={() => onSelectView(item.id)}
-              onTouchStart={() => {
-                if (item.id === "transactions") void import("./transactions-view");
-                if (item.id === "manage") void import("./manage-view");
-              }}
-              className={`flex flex-1 flex-col items-center justify-center gap-1 py-2 min-h-[56px] transition-colors ${
-                active ? "text-accent font-semibold" : "text-mute hover:text-cream"
-              }`}
-            >
-              <Icon size={18} strokeWidth={active ? 2.4 : 2} />
-              <span className="text-[11px] tracking-tight">{item.label}</span>
-              {active && <span className="h-1 w-1 rounded-full bg-accent -mt-0.5" />}
-            </button>
-          );
-        })}
-      </nav>
-    </>
+        <ChevronLeft size={18} />
+      </button>
+      <p
+        aria-live="polite"
+        className={`px-1 text-center font-display text-[13.5px] font-semibold tracking-tight text-fg capitalize ${
+          compact ? "min-w-[5.25rem] xs:min-w-[8.25rem]" : "min-w-[8.75rem]"
+        }`}
+      >
+        {compact ? (
+          <>
+            <span className="xs:hidden">
+              {shortMonthLabel(month.y, month.m)} {month.y}
+            </span>
+            <span className="hidden xs:inline">{fullMonthLabel(month.y, month.m)}</span>
+          </>
+        ) : (
+          fullMonthLabel(month.y, month.m)
+        )}
+      </p>
+      <button
+        type="button"
+        aria-label="Próximo mês"
+        onClick={() => onChange(shiftMonth(month.y, month.m, 1))}
+        className="grid h-10 w-10 place-items-center rounded-[14px] text-fg-muted transition-colors hover:bg-fg/[0.06] hover:text-fg"
+      >
+        <ChevronRight size={18} />
+      </button>
+    </div>
   );
 });
 
 /* -------------------------------------------------------------------------- */
-/* Mobile menu: botão + drawer, com o estado `open` isolado aqui               */
+/* Resumo do mês (sidebar e menu)                                              */
 /* -------------------------------------------------------------------------- */
 
-export type MobileMenuProps = Omit<NavDrawerProps, "open" | "onClose">;
-
-/**
- * O estado de abertura mora neste componente de propósito. Quando ele vivia no
- * FinanceApp, alternar o menu re-renderizava toda a árvore de views (Overview
- * com os gráficos, ManageView), gerando uma long task a cada toque e engasgando
- * a animação de deslize do drawer.
- */
-export function MobileMenu(props: MobileMenuProps) {
-  const [open, setOpen] = useState(false);
+export function MonthSummary({
+  income,
+  expense,
+  net,
+  header,
+}: {
+  income: number;
+  expense: number;
+  net: number;
+  header: ReactNode;
+}) {
+  const ratio = income > 0 ? Math.min(100, (expense / income) * 100) : expense > 0 ? 100 : 0;
   return (
-    <>
-      <button
-        onClick={() => setOpen(true)}
-        aria-label="Abrir menu"
-        className="grid h-11 w-11 place-items-center rounded-xl border border-line text-mute transition-colors hover:border-line-strong hover:text-cream"
-      >
-        <Menu size={20} />
-      </button>
-      <NavDrawer {...props} open={open} onClose={() => setOpen(false)} />
-    </>
+    <div className="rounded-2xl border border-line bg-surface p-3.5">
+      {header}
+      <dl className="space-y-2 text-[12.5px]">
+        <div className="flex items-center justify-between">
+          <dt className="text-fg-muted">Receitas</dt>
+          <dd className="font-display font-medium text-accent tabular-nums">{fmt(income)}</dd>
+        </div>
+        <div className="flex items-center justify-between">
+          <dt className="text-fg-muted">Despesas</dt>
+          <dd className="font-display font-medium text-negative tabular-nums">{fmt(expense)}</dd>
+        </div>
+        <div
+          className="h-1.5 overflow-hidden rounded-full bg-fg/[0.08]"
+          role="img"
+          aria-label={`Despesas consomem ${Math.round(ratio)}% das receitas`}
+        >
+          <div
+            className={`h-full rounded-full transition-[width] duration-500 ${ratio >= 100 ? "bg-negative" : ratio >= 80 ? "bg-warning" : "bg-accent"}`}
+            style={{ width: `${ratio}%` }}
+          />
+        </div>
+        <div className="flex items-center justify-between pt-0.5">
+          <dt className="text-fg-muted">Balanço</dt>
+          <dd className={`font-display font-semibold tabular-nums ${net >= 0 ? "text-accent" : "text-negative"}`}>{fmt(net)}</dd>
+        </div>
+      </dl>
+    </div>
   );
 }
 
 /* -------------------------------------------------------------------------- */
-/* Navigation Drawer (Slide-out menu for Mobile / Tablet)                    */
+/* Barra de navegação inferior (celular e tablet)                              */
 /* -------------------------------------------------------------------------- */
 
-interface NavDrawerProps {
-  open: boolean;
-  onClose: () => void;
-  user: UserDTO;
-  month: { y: number; m: number };
-  monthIncome: number;
-  monthExpense: number;
-  monthNet: number;
-  onSelectSection: (id: string) => void;
-  onOpenNew: () => void;
-  reportUrl: (format: "csv" | "pdf") => string;
-  onLogout: () => void;
+const NAV_ITEMS: { id: View; label: string; icon: typeof LayoutDashboard }[] = [
+  { id: "overview", label: "Resumo", icon: LayoutDashboard },
+  { id: "transactions", label: "Transações", icon: ArrowLeftRight },
+  { id: "manage", label: "Cadastros", icon: Settings2 },
+];
+
+function NavButton({
+  active,
+  label,
+  icon: Icon,
+  badge,
+  onClick,
+  onTouchStart,
+  ariaCurrent = true,
+}: {
+  active: boolean;
+  label: string;
+  icon: typeof LayoutDashboard;
+  badge?: number;
+  onClick: () => void;
+  onTouchStart?: () => void;
+  ariaCurrent?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      onTouchStart={onTouchStart}
+      aria-current={ariaCurrent && active ? "page" : undefined}
+      aria-label={badge ? `${label}, ${badge} pendentes` : undefined}
+      className="flex min-w-0 flex-col items-center justify-center gap-1"
+    >
+      <span
+        className={`relative grid h-8 w-14 place-items-center rounded-full transition-colors duration-200 ${
+          active ? "bg-accent/15 text-accent" : "text-fg-muted"
+        }`}
+      >
+        <Icon size={20} strokeWidth={active ? 2.3 : 1.9} />
+        {badge ? (
+          <span className="absolute -top-1 right-1.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-warning px-1 text-[10.5px] font-bold text-surface">
+            {badge > 99 ? "99+" : badge}
+          </span>
+        ) : null}
+      </span>
+      <span className={`max-w-full truncate text-[11px] leading-none font-medium ${active ? "text-fg" : "text-fg-muted"}`}>
+        {label}
+      </span>
+    </button>
+  );
 }
 
-function NavDrawer({
+export const BottomNav = memo(function BottomNav({
+  view,
+  menuOpen,
+  pendingCount,
+  onSelectView,
+  onOpenNew,
+  onOpenMenu,
+}: {
+  view: View;
+  menuOpen: boolean;
+  pendingCount: number;
+  onSelectView: (v: View) => void;
+  onOpenNew: () => void;
+  onOpenMenu: () => void;
+}) {
+  const preload = (id: View) => {
+    if (id === "transactions") void import("./transactions-view");
+    if (id === "manage") void import("./manage-view");
+  };
+  const [overview, transactions, manage] = NAV_ITEMS;
+  const item = (nav: (typeof NAV_ITEMS)[number], badge?: number) => (
+    <NavButton
+      active={!menuOpen && view === nav.id}
+      label={nav.label}
+      icon={nav.icon}
+      badge={badge}
+      onClick={() => onSelectView(nav.id)}
+      onTouchStart={() => preload(nav.id)}
+    />
+  );
+
+  return (
+    <nav
+      aria-label="Navegação principal"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-canvas/95 pb-[var(--safe-b)] shadow-nav lg:hidden"
+    >
+      <div className="mx-auto grid h-16 max-w-xl grid-cols-5 px-1">
+        {item(overview)}
+        {item(transactions, pendingCount)}
+        <div className="grid place-items-center">
+          <button
+            type="button"
+            onClick={onOpenNew}
+            onTouchStart={() => void import("./transaction-modal")}
+            aria-label="Nova transação"
+            className="grid h-12 w-12 -translate-y-1.5 place-items-center rounded-2xl bg-primary text-ink shadow-glow transition-transform active:scale-95"
+          >
+            <Plus size={24} strokeWidth={2.5} />
+          </button>
+        </div>
+        {item(manage)}
+        <NavButton active={menuOpen} label="Mais" icon={Menu} onClick={onOpenMenu} ariaCurrent={false} />
+      </div>
+    </nav>
+  );
+});
+
+/* -------------------------------------------------------------------------- */
+/* Menu "Mais" (bottom sheet)                                                  */
+/* -------------------------------------------------------------------------- */
+
+export function MenuSheet({
   open,
   onClose,
   user,
@@ -153,168 +258,79 @@ function NavDrawer({
   monthIncome,
   monthExpense,
   monthNet,
-  onSelectSection,
-  onOpenNew,
   reportUrl,
+  onSelectSection,
   onLogout,
-}: NavDrawerProps) {
-  // Lock body scroll when open and handle ESC key
-  useEffect(() => {
-    if (!open) return;
-
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.body.style.overflow = originalOverflow;
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [open, onClose]);
-
+}: {
+  open: boolean;
+  onClose: () => void;
+  user: UserDTO;
+  month: MonthValue;
+  monthIncome: number;
+  monthExpense: number;
+  monthNet: number;
+  reportUrl: (format: "csv" | "pdf") => string;
+  onSelectSection: (id: string) => void;
+  onLogout: () => void;
+}) {
   return (
-    <AnimatePresence>
-      {open && (
-        <div className="fixed inset-0 z-50 flex lg:hidden">
-          {/* Backdrop */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.18, ease: "easeOut" }}
-            onClick={onClose}
-            aria-hidden="true"
-            className="fixed inset-0 bg-ink/82"
-          />
+    <Sheet
+      open={open}
+      onClose={onClose}
+      eyebrow="sua conta"
+      title={user.name}
+      description={user.email}
+      footer={
+        <button type="button" onClick={() => void onLogout()} className="btn btn-danger w-full">
+          <LogOut size={16} /> Sair da conta
+        </button>
+      }
+    >
+      <div className="space-y-6">
+        <MonthSummary
+          income={monthIncome}
+          expense={monthExpense}
+          net={monthNet}
+          header={<p className="mb-3 font-display text-[13.5px] font-semibold text-fg capitalize">{fullMonthLabel(month.y, month.m)}</p>}
+        />
 
-          {/* Drawer Panel */}
-          <motion.aside
-            role="dialog"
-            aria-modal="true"
-            aria-label="Menu principal"
-            initial={{ x: "-100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: "-100%" }}
-            transition={{ type: "spring", damping: 34, stiffness: 420, mass: 0.85 }}
-            className="relative flex h-full w-[min(320px,85vw)] max-w-sm flex-col overflow-y-auto border-r border-line bg-panel p-5 text-cream shadow-2xl pb-[calc(1.5rem+env(safe-area-inset-bottom))]"
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between">
-              <AurumLogo size={32} />
+        <section>
+          <h3 className="eyebrow mb-2.5">Ir para</h3>
+          <div className="grid grid-cols-2 gap-2">
+            {SECTIONS.map((item) => (
               <button
-                onClick={onClose}
-                aria-label="Fechar menu"
-                className="grid h-11 w-11 place-items-center rounded-xl border border-line text-mute transition-colors hover:border-line-strong hover:text-cream"
+                key={item.id}
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onSelectSection(item.id);
+                }}
+                className="flex min-h-12 items-center gap-2.5 rounded-2xl border border-line bg-fg/[0.02] px-3.5 text-left text-[13.5px] font-medium text-fg transition-colors hover:border-line-strong"
               >
-                <X size={18} />
+                <item.icon size={17} className="shrink-0 text-accent" />
+                <span className="truncate">{item.label}</span>
               </button>
-            </div>
+            ))}
+          </div>
+        </section>
 
-            {/* Quick action button */}
-            <button
-              onClick={() => {
-                onClose();
-                onOpenNew();
-              }}
-              className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3 text-[13.5px] font-semibold text-ink shadow-[0_8px_30px_-6px_rgba(182,242,68,0.4)] transition-all active:scale-[0.98]"
-            >
-              <Plus size={16} strokeWidth={2.6} />
-              Nova transação
-            </button>
+        <section>
+          <h3 className="eyebrow mb-2.5">Aparência</h3>
+          <ThemeSegmented />
+        </section>
 
-            {/* Panel section shortcuts */}
-            <p className="eyebrow mt-6 px-1">Painéis</p>
-            <nav className="mt-2 space-y-1">
-              {SECTIONS.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => {
-                    onClose();
-                    onSelectSection(item.id);
-                  }}
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-medium text-mute transition-colors hover:bg-cream/4 hover:text-cream"
-                >
-                  <item.icon size={16} strokeWidth={2} className="text-faint" />
-                  {item.label}
-                </button>
-              ))}
-            </nav>
-
-            {/* Month Summary Card */}
-            <div className="mt-6 rounded-2xl border border-line bg-ink/60 p-4">
-              <p className="eyebrow mb-3 capitalize">{fullMonthLabel(month.y, month.m)}</p>
-              <div className="space-y-2 text-[12px]">
-                <p className="flex items-center justify-between">
-                  <span className="text-mute">Receitas</span>
-                  <span className="font-display font-medium text-accent">{fmt(monthIncome)}</span>
-                </p>
-                <p className="flex items-center justify-between">
-                  <span className="text-mute">Despesas</span>
-                  <span className="font-display font-medium text-coral">{fmt(monthExpense)}</span>
-                </p>
-                <div className="h-1 overflow-hidden rounded-full bg-cream/8">
-                  <div
-                    className="h-full rounded-full bg-accent transition-all duration-500"
-                    style={{
-                      width: `${
-                        monthIncome > 0
-                          ? Math.min(100, (monthIncome / Math.max(monthIncome, monthExpense)) * 100)
-                          : 0
-                      }%`,
-                    }}
-                  />
-                </div>
-                <p className="flex items-center justify-between pt-1">
-                  <span className="text-mute">Balanço</span>
-                  <span
-                    className="font-display font-semibold"
-                    style={{ color: monthNet >= 0 ? "#b6f244" : "#ff6e82" }}
-                  >
-                    {fmt(monthNet)}
-                  </span>
-                </p>
-              </div>
-            </div>
-
-            {/* Export buttons */}
-            <div className="mt-4 flex gap-2">
-              <a
-                href={reportUrl("csv")}
-                title="Exportar CSV"
-                className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-line py-2.5 text-xs font-medium text-mute transition-colors hover:border-line-strong hover:text-cream"
-              >
-                <Download size={13} /> CSV
-              </a>
-              <a
-                href={reportUrl("pdf")}
-                title="Exportar PDF"
-                className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-line py-2.5 text-xs font-medium text-mute transition-colors hover:border-line-strong hover:text-cream"
-              >
-                <Download size={13} /> PDF
-              </a>
-            </div>
-
-            {/* User & Logout */}
-            <div className="mt-auto pt-6 flex items-center justify-between gap-2 border-t border-line/60 px-1 text-[11px] text-faint">
-              <span className="min-w-0 flex-1 truncate" title={user.email}>
-                {user.name}
-              </span>
-              <button
-                onClick={() => void onLogout()}
-                aria-label="Sair"
-                className="flex items-center gap-1 text-faint hover:text-coral transition-colors py-1 px-2 rounded-lg hover:bg-coral/10"
-              >
-                <LogOut size={14} />
-                <span>Sair</span>
-              </button>
-            </div>
-          </motion.aside>
-        </div>
-      )}
-    </AnimatePresence>
+        <section>
+          <h3 className="eyebrow mb-2.5">Exportar relatório do mês</h3>
+          <div className="grid grid-cols-2 gap-2">
+            <a href={reportUrl("csv")} className="btn btn-secondary">
+              <Download size={15} /> CSV
+            </a>
+            <a href={reportUrl("pdf")} className="btn btn-secondary">
+              <Download size={15} /> PDF
+            </a>
+          </div>
+        </section>
+      </div>
+    </Sheet>
   );
 }

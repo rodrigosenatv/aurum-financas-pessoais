@@ -3,6 +3,7 @@ import { Instrument_Serif, Inter, Space_Grotesk } from "next/font/google";
 import type { ReactNode } from "react";
 import { MotionProvider } from "@/components/motion-provider";
 import { PwaProvider } from "@/components/pwa-provider";
+import { THEME_COLORS, THEME_SCRIPT } from "@/lib/theme-script";
 import "./globals.css";
 
 const grotesk = Space_Grotesk({
@@ -29,7 +30,11 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#060807",
+  // segue o tema do sistema; a escolha manual é aplicada em lib/theme.ts
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: THEME_COLORS.light },
+    { media: "(prefers-color-scheme: dark)", color: THEME_COLORS.dark },
+  ],
 };
 
 export const metadata: Metadata = {
@@ -64,9 +69,15 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html
       lang="pt-BR"
+      // o script de tema altera data-theme antes da hidratação
+      suppressHydrationWarning
       className={`${grotesk.variable} ${iserif.variable} ${inter.variable}`}
     >
-      <body className="min-h-dvh bg-ink font-sans text-cream antialiased overscroll-y-none">
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
+      <body className="min-h-dvh bg-canvas font-sans text-fg antialiased overscroll-y-none">
+        <div aria-hidden className="status-scrim" />
         <MotionProvider>
           {children}
           <PwaProvider />
@@ -75,4 +86,3 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     </html>
   );
 }
-

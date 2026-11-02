@@ -14,6 +14,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { AurumEmblem } from "./logo";
+import { Sheet } from "./sheet";
 
 interface BeforeInstallPromptEvent extends Event {
   readonly platforms: string[];
@@ -187,10 +188,10 @@ export function PwaProvider() {
             initial={{ opacity: 0, y: -40 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -40 }}
-            className="fixed top-3 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-full border border-amber-500/30 bg-ink/95 px-4 py-2 text-xs font-medium text-amber-300 shadow-2xl backdrop-blur-md"
+            className="fixed top-[calc(0.75rem+var(--safe-t))] left-1/2 z-[110] flex -translate-x-1/2 items-center gap-2 rounded-full border border-warning/35 bg-surface/95 px-4 py-2 text-[12.5px] font-medium whitespace-nowrap text-warning shadow-pop"
           >
-            <WifiOff size={14} className="animate-pulse text-amber-400" />
-            <span>Modo Offline: exibindo dados em cache</span>
+            <WifiOff size={14} />
+            <span>Sem conexão · exibindo dados salvos</span>
           </motion.aside>
         )}
 
@@ -200,10 +201,10 @@ export function PwaProvider() {
             initial={{ opacity: 0, y: -40 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -40 }}
-            className="fixed top-3 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-full border border-accent/40 bg-ink/95 px-4 py-2 text-xs font-medium text-accent shadow-2xl backdrop-blur-md"
+            className="fixed top-[calc(0.75rem+var(--safe-t))] left-1/2 z-[110] flex -translate-x-1/2 items-center gap-2 rounded-full border border-accent/40 bg-surface/95 px-4 py-2 text-[12.5px] font-medium whitespace-nowrap text-accent shadow-pop"
           >
             <Wifi size={14} />
-            <span>Conexão restabelecida!</span>
+            <span>Conexão restabelecida</span>
           </motion.aside>
         )}
       </AnimatePresence>
@@ -215,22 +216,20 @@ export function PwaProvider() {
             initial={{ opacity: 0, scale: 0.95, y: -20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: -20 }}
-            className="fixed top-4 right-4 z-50 flex max-w-sm items-center gap-3 rounded-2xl border border-accent/30 bg-surface-1/95 p-3.5 shadow-2xl backdrop-blur-xl"
+            className="fixed top-[calc(1rem+var(--safe-t))] right-4 left-4 z-[110] mx-auto flex max-w-sm items-center gap-3 rounded-2xl border border-accent/30 bg-surface p-3.5 shadow-pop sm:left-auto"
           >
             <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-accent/15 text-accent">
               <Sparkles size={20} />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-cream">Nova versão disponível</p>
-              <p className="text-[11px] text-cream-muted truncate">
-                Atualize para carregar novas melhorias.
-              </p>
+              <p className="text-[13.5px] font-semibold text-fg">Nova versão disponível</p>
+              <p className="truncate text-[12.5px] text-fg-muted">Atualize para carregar as melhorias.</p>
             </div>
             <button
               onClick={handleApplyUpdate}
-              className="flex shrink-0 items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-ink transition-transform active:scale-95"
+              className="btn btn-primary min-h-10 shrink-0 px-3"
             >
-              <RefreshCw size={12} />
+              <RefreshCw size={14} />
               Atualizar
             </button>
           </motion.aside>
@@ -245,116 +244,81 @@ export function PwaProvider() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 80 }}
             transition={{ type: "spring", damping: 26, stiffness: 320 }}
-            className="fixed bottom-20 left-4 right-4 z-40 mx-auto max-w-md rounded-2xl border border-border/80 bg-surface-1/95 p-4 shadow-[0_20px_50px_rgba(0,0,0,0.8)] backdrop-blur-xl lg:bottom-6"
+            className="fixed right-4 bottom-[calc(5.75rem+var(--safe-b))] left-4 z-[45] mx-auto max-w-md rounded-[22px] border border-line-strong bg-surface p-4 shadow-pop lg:right-6 lg:bottom-6 lg:left-auto lg:mx-0 lg:w-[400px]"
           >
             <div className="flex items-start gap-3.5">
               <AurumEmblem size={44} className="shrink-0 rounded-xl" />
               <div className="flex-1 min-w-0 pr-6">
                 <div className="flex items-center gap-1.5">
-                  <span className="font-semibold text-sm text-cream">Instalar o Aurum</span>
-                  <span className="rounded bg-accent/20 px-1.5 py-0.5 text-[10px] font-bold text-accent">
-                    App
-                  </span>
+                  <span className="text-[14.5px] font-semibold text-fg">Instale o Aurum</span>
+                  <span className="chip bg-accent/15 text-accent">App</span>
                 </div>
-                <p className="mt-1 text-xs text-cream-muted leading-relaxed">
-                  Adicione à tela inicial para abrir como app, em tela cheia e com acesso instantâneo.
+                <p className="mt-1 text-[13px] leading-relaxed text-fg-muted">
+                  Abra direto da tela inicial, em tela cheia, como um app.
                 </p>
               </div>
               <button
                 onClick={handleDismissInstall}
                 aria-label="Fechar"
-                className="absolute top-3.5 right-3.5 grid h-7 w-7 place-items-center rounded-lg text-cream-muted hover:bg-surface-2 hover:text-cream transition-colors"
+                className="icon-btn absolute top-2 right-2 h-10 w-10"
               >
-                <X size={15} />
+                <X size={16} />
               </button>
             </div>
 
             <div className="mt-3.5 flex items-center gap-2">
               <button
                 onClick={handleInstallClick}
-                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-accent py-2.5 px-4 text-xs font-semibold text-ink shadow-[0_4px_20px_rgba(182,242,68,0.3)] transition-transform active:scale-95"
+                className="btn btn-primary flex-1"
               >
                 <Download size={15} strokeWidth={2.4} />
-                {isIosDevice ? "Ver como instalar no iPhone" : "Instalar aplicativo"}
+                {isIosDevice ? "Como instalar" : "Instalar"}
               </button>
               <button
                 onClick={handleDismissInstall}
-                className="rounded-xl border border-border bg-surface-2/60 py-2.5 px-3.5 text-xs font-medium text-cream-muted hover:text-cream transition-colors"
+                className="btn btn-secondary"
               >
-                Depois
+                Agora não
               </button>
             </div>
           </motion.aside>
         )}
       </AnimatePresence>
 
-      {/* 4. iOS Safari Installation Instructions Modal */}
-      <AnimatePresence>
-        {showIosGuide && (
-          <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-4 backdrop-blur-sm sm:items-center">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 40 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 40 }}
-              className="relative w-full max-w-sm rounded-3xl border border-border bg-surface-1 p-6 shadow-2xl text-cream"
-            >
-              <button
-                onClick={() => setShowIosGuide(false)}
-                className="absolute top-4 right-4 grid h-8 w-8 place-items-center rounded-xl bg-surface-2 text-cream-muted hover:text-cream"
-              >
-                <X size={16} />
-              </button>
-
-              <div className="flex items-center gap-3">
-                <AurumEmblem size={48} />
-                <div>
-                  <h2 className="font-semibold text-base text-cream">Instalar no iOS</h2>
-                  <p className="text-xs text-cream-muted">Safari / iPhone & iPad</p>
-                </div>
-              </div>
-
-              <div className="mt-5 space-y-3.5 text-xs text-cream-muted">
-                <div className="flex items-center gap-3 rounded-xl border border-border/60 bg-surface-2/50 p-3">
-                  <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-surface-3 text-accent">
-                    <Share size={16} />
-                  </div>
-                  <div>
-                    <span className="font-semibold text-cream">1. Toque em Compartilhar</span>
-                    <p className="text-[11px]">Localizado na barra inferior do Safari.</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3 rounded-xl border border-border/60 bg-surface-2/50 p-3">
-                  <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-surface-3 text-accent">
-                    <PlusSquare size={16} />
-                  </div>
-                  <div>
-                    <span className="font-semibold text-cream">2. Adicionar à Tela de Início</span>
-                    <p className="text-[11px]">Role as opções para baixo até encontrar.</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3 rounded-xl border border-border/60 bg-surface-2/50 p-3">
-                  <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-surface-3 text-accent">
-                    <Smartphone size={16} />
-                  </div>
-                  <div>
-                    <span className="font-semibold text-cream">3. Pronto!</span>
-                    <p className="text-[11px]">Abra o Aurum como aplicativo nativo.</p>
-                  </div>
-                </div>
-              </div>
-
-              <button
-                onClick={() => setShowIosGuide(false)}
-                className="mt-6 w-full rounded-xl bg-accent py-3 text-xs font-semibold text-ink transition-transform active:scale-95"
-              >
-                Entendi
-              </button>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      {/* 4. Passo a passo de instalação no iOS (Safari não tem prompt nativo) */}
+      <Sheet
+        open={showIosGuide}
+        onClose={() => setShowIosGuide(false)}
+        size="sm"
+        eyebrow="Safari · iPhone e iPad"
+        title="Instalar no iPhone"
+        headerAside={<AurumEmblem size={40} />}
+        footer={
+          <button type="button" onClick={() => setShowIosGuide(false)} className="btn btn-primary w-full">
+            Entendi
+          </button>
+        }
+      >
+        <ol className="space-y-2.5">
+          {[
+            { icon: Share, title: "Toque em Compartilhar", text: "O ícone fica na barra inferior do Safari." },
+            { icon: PlusSquare, title: "Adicionar à Tela de Início", text: "Role as opções para baixo até encontrar." },
+            { icon: Smartphone, title: "Pronto", text: "Abra o Aurum pelo ícone, como um app." },
+          ].map((step, index) => (
+            <li key={step.title} className="flex items-center gap-3 rounded-2xl border border-line bg-fg/[0.02] p-3">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-accent/12 text-accent">
+                <step.icon size={17} />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-[14px] font-semibold text-fg">
+                  {index + 1}. {step.title}
+                </span>
+                <span className="block text-[12.5px] text-fg-muted">{step.text}</span>
+              </span>
+            </li>
+          ))}
+        </ol>
+      </Sheet>
     </>
   );
 }
