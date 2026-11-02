@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { db } from "@/db";
 import { budgets, categories, goals, transactions, users } from "@/db/schema";
 import { and, desc, eq, gt, like, sql } from "drizzle-orm";
-import { createPdf } from "@/app/api/reports/[format]/route";
+import { createPdf } from "@/lib/pdf";
 import { sanitizeCsvCell } from "@/lib/api";
 import { TelegramClient, type TelegramCallbackQuery, type TelegramMessage, type TelegramUpdate } from "./client";
 import { parseAudioWithGemini, parseReceiptWithGemini, parseTextWithGemini } from "./gemini";
